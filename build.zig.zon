@@ -1,0 +1,25 @@
+.{
+    .name = .mlam,
+    .fingerprint = 0xe6208585fdbe8afb,
+
+    .version = "0.0.0",
+
+    .minimum_zig_version = "0.14.0",
+
+    .dependencies = .{
+        .cimgui = .{
+            .url = "https://github.com/cimgui/cimgui/archive/refs/tags/1.91.9bdock.zip",
+            .hash = "N-V-__8AABviNADZdf7HY8mcBNRX4MA1vuMTZHEnbFMH-ofL",
+        },
+        .imgui = .{
+            .url = "https://github.com/ocornut/imgui/archive/refs/tags/v1.91.9b-docking.zip",
+            .hash = "N-V-__8AAGz7cwAqkxfbti86QQ-ue7yBbmGE6BGCZCkmoXy1",
+        },
+    },
+
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "src",
+    },
+}
