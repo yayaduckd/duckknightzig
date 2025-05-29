@@ -82,8 +82,8 @@ fn compileShaders(b: *std.Build) !void {
         if (!checkIsShaderFile(shader)) {
             continue;
         }
+
         const path = try std.mem.join(b.allocator, "", &.{ shaderPath, shader.basename });
-        defer b.allocator.free(path);
         try compileShader(path, shaderBuildPath, shader.basename, b.allocator);
     }
 }
@@ -92,8 +92,34 @@ const Shader_HarshCompilationReq = true;
 fn compileShader(path: []const u8, destination_path: []const u8, shader_name: []const u8, alloc: std.mem.Allocator) !void {
     const compile = try std.mem.join(alloc, "", &.{ destination_path, shader_name, ".spv" });
     defer alloc.free(compile);
-    var glslang = std.process.Child.init(&.{ "glslang", "--quiet", "-V", path, "-o", compile }, alloc);
-    const exit_info = try glslang.spawnAndWait();
+
+    // parse shader type
+    // get file extension
+    var last_dot_index = shader_name.len - 1;
+    while (last_dot_index >= 0) : (last_dot_index -= 1) {
+        if (shader_name[last_dot_index] == '.') {
+            break;
+        }
+    }
+    if (last_dot_index < 0) {
+        std.log.debug("invalid shader name {s}", .{shader_name});
+        return;
+    }
+    const shader_extension = shader_name[last_dot_index..];
+    var shader_type: ?[]const u8 = null;
+    if (std.mem.eql(u8, shader_extension, ".vert")) {
+        shader_type = std.fmt.allocPrint(alloc, "vs_5_1", .{}) catch unreachable;
+    } else if (std.mem.eql(u8, shader_extension, ".frag")) {
+        shader_type = std.fmt.allocPrint(alloc, "ps_5_1", .{}) catch unreachable;
+    }
+
+    if (shader_type == null) {
+        std.log.debug("invalid shader ext {s}", .{shader_name});
+        return;
+    }
+
+    var dxc = std.process.Child.init(&.{ "dxc", path, "-spirv", "-T", shader_type.?, "-Fo", compile }, alloc);
+    const exit_info = try dxc.spawnAndWait();
     if (exit_info.Exited != 0 and Shader_HarshCompilationReq) {
         // std.log.err("glslang failed to compile shader: {s}", .{path});
         return error.FailedShaderCompilation;
@@ -104,6 +130,7 @@ fn compileShader(path: []const u8, destination_path: []const u8, shader_name: []
 // declaratively construct a build graph that will be executed by an external
 // runner.
 pub fn build(b: *std.Build) void {
+    compileShaders(b) catch @panic("rip shader :(");
     // Standard target options allows the person running `zig build` to choose
     // what target to build for. Here we do not override the defaults, which
     // means any target is allowed, and the default is native. Other options
@@ -129,6 +156,9 @@ pub fn build(b: *std.Build) void {
     // This creates another `std.Build.Step.Compile`, but this one builds an executable
     // rather than a static library.
     const exe = create_exe(b, target, optimize);
+    const exe_check = create_exe(b, target, optimize);
+    const check = b.step("check", "Check if foo compiles");
+    check.dependOn(&exe_check.step);
 
     // This declares intent for the executable to be installed into the
     // standard location when the user invokes the "install" step (the default

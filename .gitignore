@@ -2,3 +2,4 @@
 .idea
 zig-out
 imgui.ini
+build
