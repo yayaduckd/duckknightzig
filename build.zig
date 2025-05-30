@@ -10,6 +10,7 @@ fn create_exe(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.bui
     exe.linkLibC();
     exe.linkLibCpp();
     exe.linkSystemLibrary("SDL3");
+    exe.linkSystemLibrary("SDL3_image");
 
     const imgui_lib = b.addStaticLibrary(.{
         .name = "imguilib",

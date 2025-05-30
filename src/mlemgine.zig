@@ -73,7 +73,7 @@ pub fn init() !Engine {
     const vertshader = try mk.load_shader(self.gpu_device, "tringle.vert.spv", 0, 1, 0, 0);
     const fragshader = try mk.load_shader(self.gpu_device, "trongle.frag.spv", 1, 1, 0, 0);
 
-    const image_data = try mk.load_image("mduck.bmp", 4);
+    const image_data = try mk.load_image("mduck.png", 4);
 
     const pipelineCreateInfo: c.SDL_GPUGraphicsPipelineCreateInfo = .{
         .target_info = .{
@@ -268,19 +268,20 @@ fn draw(self: *Engine) void {
     const draw_data_ptr = c.igGetDrawData();
     if (draw_data_ptr == null) {
         std.log.warn("iggetdrawdata() returned null.", .{});
-        c.SDL_Delay(16);
+
+        std.time.sleep(16 * 1000 * 1000);
         return;
     }
     const draw_data = draw_data_ptr.?;
     if (draw_data.*.DisplaySize.x <= 0.0 or draw_data.*.DisplaySize.y <= 0.0) {
-        c.SDL_Delay(16); // if draw area is 0 or negative, skip rendering cycle
+        std.time.sleep(16 * 1000 * 1000); // if draw area is 0 or negative, skip rendering cycle
         return;
     }
 
     const command_buffer_ptr = c.SDL_AcquireGPUCommandBuffer(self.gpu_device);
     if (command_buffer_ptr == null) {
         std.log.warn("failed to acquire gpu command buffer.", .{});
-        c.SDL_Delay(16);
+        std.time.sleep(16 * 1000 * 1000);
         return;
     }
     const command_buffer = command_buffer_ptr.?;
@@ -400,7 +401,7 @@ fn update(self: *Engine) void {
         }
     }
     if ((c.SDL_GetWindowFlags(self.window) & c.SDL_WINDOW_MINIMIZED) != 0) {
-        c.SDL_Delay(10); // if window is minimized, delay to reduce cpu usage
+        std.time.sleep(16 * 1000 * 1000); // if window is minimized, delay to reduce cpu usage
         return;
     }
 }

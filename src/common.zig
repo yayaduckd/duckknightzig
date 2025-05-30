@@ -135,15 +135,12 @@ pub fn determine_shader_type(filename: []const u8) ShaderType {
 }
 
 pub fn load_image(filename: []const u8, desired_channels: u8) !*c.SDL_Surface {
-    // _ = filename; // autofix
     var path_buf: [256]u8 = undefined;
-    // SDL_Surface *result;
-    // SDL_PixelFormat format;
     var format: c.SDL_PixelFormat = undefined;
 
     const full_path = try std.fmt.bufPrintZ(&path_buf, "{s}/{s}", .{ TEXTURE_PATH, filename });
 
-    var result: ?*c.SDL_Surface = c.SDL_LoadBMP(full_path);
+    var result: ?*c.SDL_Surface = c.IMG_Load(full_path);
 
     if (result == null) {
         return error.MkCouldntLoadBMP;
