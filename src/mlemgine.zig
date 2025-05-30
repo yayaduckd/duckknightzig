@@ -57,6 +57,10 @@ pub fn init() !Engine {
     // setup general stuff
     try self.init_graphics();
 
+    // shaders
+    const shader = try mk.load_shader(self.gpu_device, "tringle.vert.spv", 0, 0, 0, 0);
+    _ = shader; // autofix
+
     // setup imgui context and io
     _ = c.igCreateContext(null);
 

@@ -1,5 +1,8 @@
 const c = @import("cmix.zig");
 const std = @import("std");
+const mk = @import("mkmix.zig");
+
+pub const SHADER_PATH = "build/shaders";
 
 pub fn sdlr(success: bool) !void {
     if (!success) {
@@ -17,4 +20,85 @@ pub fn fatal_sdl_error(comptime msg: []const u8) !void {
         std.log.err("{s} - (no sdl error message available)", .{msg});
     }
     return error.SDLBorken;
+}
+
+const ShaderType = enum {
+    Vertex,
+    Fragment,
+    Compute,
+};
+
+pub fn load_shader(
+    device: *c.SDL_GPUDevice,
+    filename: []const u8,
+    sampler_count: u32,
+    uniform_buffer_count: u32,
+    storage_buffer_count: u32,
+    storage_texture_count: u32,
+) !*c.SDL_GPUShader {
+    const stage: c.SDL_GPUShaderStage = switch (determine_shader_type(filename)) {
+        .Vertex => c.SDL_GPU_SHADERSTAGE_VERTEX,
+        .Fragment => c.SDL_GPU_SHADERSTAGE_FRAGMENT,
+        .Compute => @panic("not supported"),
+    };
+
+    var buf: [512]u8 = undefined;
+    const full_filepath = std.fmt.bufPrintZ(&buf, "{s}/{s}", .{ mk.SHADER_PATH, filename }) catch {
+        return error.MkFormatFilepathError;
+    };
+
+    var code_size: usize = 0;
+    const code = c.SDL_LoadFile(full_filepath, &code_size);
+
+    const shader_info: c.SDL_GPUShaderCreateInfo = .{
+        .code = @ptrCast(code),
+        .code_size = code_size,
+        .entrypoint = "main",
+        .format = c.SDL_GPU_SHADERFORMAT_SPIRV,
+        .stage = stage,
+        .num_samplers = sampler_count,
+        .num_uniform_buffers = uniform_buffer_count,
+        .num_storage_buffers = storage_buffer_count,
+        .num_storage_textures = storage_texture_count,
+    };
+    const shaderOrNull = c.SDL_CreateGPUShader(device, &shader_info);
+    if (shaderOrNull) |shader| {
+        c.SDL_free(code);
+        return shader;
+    }
+    std.log.debug("failed to create shader", .{});
+    c.SDL_free(code);
+    return error.MkShaderCreationFailed;
+}
+
+pub fn determine_shader_type(filename: []const u8) ShaderType {
+    // parse shader type
+    // get file extension
+    var last_dot_index = filename.len - 1;
+    var second_last_dot_index = filename.len - 1;
+    while (last_dot_index >= 0) : (last_dot_index -= 1) {
+        if (filename[last_dot_index] == '.') {
+            break;
+        }
+    }
+    second_last_dot_index = last_dot_index - 1;
+    while (second_last_dot_index >= 0) : (second_last_dot_index -= 1) {
+        if (filename[second_last_dot_index] == '.') {
+            break;
+        }
+    }
+    if (last_dot_index < 0) {
+        std.log.panic("invalid shader name {s}", .{filename});
+        return;
+    }
+    const shader_extension = filename[second_last_dot_index..last_dot_index];
+    if (std.mem.eql(u8, shader_extension, ".vert")) {
+        return ShaderType.Vertex;
+    } else if (std.mem.eql(u8, shader_extension, ".frag")) {
+        return ShaderType.Fragment;
+    } else if (std.mem.eql(u8, shader_extension, ".comp")) {
+        return ShaderType.Compute;
+    } else {
+        std.debug.panic("Invalid shader type {s}", .{shader_extension});
+    }
 }
