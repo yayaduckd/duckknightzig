@@ -3,6 +3,37 @@ const std = @import("std");
 const mk = @import("mkmix.zig");
 
 pub const SHADER_PATH = "build/shaders";
+pub const TEXTURE_PATH = "textures";
+
+pub const PositionTextureVertex = struct {
+    x: f32,
+    y: f32,
+    z: f32,
+
+    u: f32,
+    v: f32,
+};
+
+pub const PositionTextureColorVertex = extern struct {
+    x: f32 = 0,
+    y: f32 = 0,
+    z: f32 = 0,
+
+    u: f32 = 0,
+    v: f32 = 0,
+
+    r: f32 = 0,
+    g: f32 = 0,
+    b: f32 = 0,
+    a: f32 = 0,
+};
+
+pub const FragMultiplyUniform = extern struct {
+    r: f32 = 0,
+    g: f32 = 0,
+    b: f32 = 0,
+    a: f32 = 0,
+};
 
 pub fn sdlr(success: bool) !void {
     if (!success) {
@@ -101,4 +132,35 @@ pub fn determine_shader_type(filename: []const u8) ShaderType {
     } else {
         std.debug.panic("Invalid shader type {s}", .{shader_extension});
     }
+}
+
+pub fn load_image(filename: []const u8, desired_channels: u8) !*c.SDL_Surface {
+    // _ = filename; // autofix
+    var path_buf: [256]u8 = undefined;
+    // SDL_Surface *result;
+    // SDL_PixelFormat format;
+    var format: c.SDL_PixelFormat = undefined;
+
+    const full_path = try std.fmt.bufPrintZ(&path_buf, "{s}/{s}", .{ TEXTURE_PATH, filename });
+
+    var result: ?*c.SDL_Surface = c.SDL_LoadBMP(full_path);
+
+    if (result == null) {
+        return error.MkCouldntLoadBMP;
+    }
+
+    if (desired_channels == 4) {
+        format = c.SDL_PIXELFORMAT_ABGR8888;
+    } else {
+        // c.SDL_assert(!"Unexpected desiredChannels");
+        c.SDL_DestroySurface(result);
+        @panic("squeeb");
+    }
+    if (result.?.format != format) {
+        const next = c.SDL_ConvertSurface(result, format);
+        c.SDL_DestroySurface(result);
+        result = next;
+    }
+
+    return result.?;
 }
