@@ -2184,6 +2184,19 @@ test "zmath.matrix.mul" {
     try expectVecApproxEqAbs(c[3], f32x4(13.54, 14.12, 14.7, 15.28), 0.0001);
 }
 
+pub fn mulMats(mats: []const Mat) Mat {
+    if (mats.len < 1) {
+        return mats[0];
+    }
+    var i: usize = mats.len - 1;
+    var result = mats[mats.len - 1];
+    while (i > 0) {
+        result = mulMat(mats[i - 1], result);
+        i -= 1;
+    }
+    return result;
+}
+
 pub fn transpose(m: Mat) Mat {
     const temp1 = @shuffle(f32, m[0], m[1], [4]i32{ 0, 1, ~@as(i32, 0), ~@as(i32, 1) });
     const temp3 = @shuffle(f32, m[0], m[1], [4]i32{ 2, 3, ~@as(i32, 2), ~@as(i32, 3) });

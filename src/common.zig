@@ -18,6 +18,7 @@ pub const PositionTextureColorVertex = extern struct {
     x: f32 = 0,
     y: f32 = 0,
     z: f32 = 0,
+    blep: f32 = 1,
 
     u: f32 = 0,
     v: f32 = 0,
