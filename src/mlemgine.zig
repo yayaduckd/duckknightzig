@@ -87,7 +87,7 @@ pub fn init() !Engine {
             .vertex_attributes = &[_]c.SDL_GPUVertexAttribute{
                 c.struct_SDL_GPUVertexAttribute{ .buffer_slot = 0, .format = c.SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3, .location = 0, .offset = 0 },
                 c.struct_SDL_GPUVertexAttribute{ .buffer_slot = 0, .format = c.SDL_GPU_VERTEXELEMENTFORMAT_FLOAT2, .location = 1, .offset = @sizeOf(f32) * 3 },
-                c.struct_SDL_GPUVertexAttribute{ .buffer_slot = 0, .format = c.SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3, .location = 2, .offset = @sizeOf(f32) * 3 + @sizeOf(f32) * 2 },
+                c.struct_SDL_GPUVertexAttribute{ .buffer_slot = 0, .format = c.SDL_GPU_VERTEXELEMENTFORMAT_FLOAT4, .location = 2, .offset = @sizeOf(f32) * 3 + @sizeOf(f32) * 2 },
             },
         },
         .primitive_type = c.SDL_GPU_PRIMITIVETYPE_TRIANGLELIST,
