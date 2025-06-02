@@ -143,7 +143,15 @@ pub fn add(self: *Self, params: SpriteParams, texture: *c.SDL_GPUTexture) void {
     }
 }
 
-pub fn copy(self: *Self, copy_pass: *c.SDL_GPUCopyPass) void {
+pub fn begin(self: *Self) void {
+    self.num_added = 0;
+    var iter = self.texture_map.iterator();
+    while (iter.next()) |next| {
+        next.value_ptr.*.clearRetainingCapacity();
+    }
+}
+
+pub fn end(self: *Self) void {
     var iter = self.texture_map.iterator();
     const texture_transfer_ptr = c.SDL_MapGPUTransferBuffer(self.gpu_device, self.transfer_buffer, false);
     var total: u32 = 0;
@@ -159,6 +167,9 @@ pub fn copy(self: *Self, copy_pass: *c.SDL_GPUCopyPass) void {
         );
         total += params_len;
     }
+}
+
+pub fn copy(self: *Self, copy_pass: *c.SDL_GPUCopyPass) void {
     c.SDL_UploadToGPUBuffer(
         copy_pass,
         &(c.SDL_GPUTransferBufferLocation){ .transfer_buffer = self.transfer_buffer, .offset = 0 },
@@ -193,15 +204,6 @@ pub fn render(self: *Self, cmd_buf: *c.SDL_GPUCommandBuffer, render_pass: *c.SDL
 
         total += params_len;
     }
-}
-
-pub fn reset(self: *Self) void {
-    self.num_added = 0;
-    var iter = self.texture_map.iterator();
-    while (iter.next()) |next| {
-        next.value_ptr.*.clearRetainingCapacity();
-    }
-    // self.texture_map.clearRetainingCapacity();
 }
 
 pub fn deinit(self: *Self) void {
