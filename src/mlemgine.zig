@@ -194,7 +194,9 @@ fn draw(self: *Engine) !void {
             );
         }
     }
+}
 
+fn draw_to_screen(self: *Engine) !void {
     const command_buffer = try mk.sdlv(c.SDL_AcquireGPUCommandBuffer(self.gpu_device));
 
     try self.imgui_frame();
@@ -210,8 +212,9 @@ pub fn run(self: *Engine) !void {
     while (!self.done) {
         const t = std.time.nanoTimestamp();
         if (t - prev_t < 1000000000 / 240) continue;
-        self.update();
-        try self.draw();
+        self.update(); // update game logic
+        try self.draw(); // draw sprites with xna-type interface
+        try self.draw_to_screen(); // sdl gpu render logic
         self.current_frame += 1;
         prev_t = t;
     }
