@@ -70,7 +70,7 @@ VertexOut main(VertexParams vertex_params) {
     float4 src = sprite.source_rect;
     const float2 uvs[4] = { src.xy, src.zy, src.xw, src.zw };
 
-    output.pos = mul(ViewProjection, float4(end_pos, 1.));
+    output.pos = mul(float4(end_pos, 1.), ViewProjection);
     output.uv = uvs[vertex_params.vertex_id];
     output.color = sprite.color;
 

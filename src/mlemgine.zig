@@ -1,6 +1,7 @@
 const c = @import("cmix.zig");
 const Batcher = @import("drawer.zig");
 const mk = @import("common.zig");
+const cam = @import("camera.zig");
 
 const std = @import("std");
 const zm = @import("include/zmath.zig");
@@ -54,6 +55,7 @@ fn init_graphics(self: *Engine) !void {
         true, // debug_mode enabled
         null,
     );
+
     if (gpu_device_ptr == null) {
         try mk.fatal_sdl_error("failed to make gpu device");
     }
@@ -238,9 +240,17 @@ pub fn init() !Engine {
         std.log.err("imgui_implsdlgpu3_init failed.", .{});
     }
 
+    const camera: cam = .default;
+    // camera.matrix = comptime zm.mulMats(&.{
+    //     zm.lookAtLh(.{ 0, 0, -5, 0 }, .{ 0, 0, 0, 0 }, .{ 0, 1, 0, 0 }),
+    //     zm.perspectiveFovLh(std.math.degreesToRadians(90), 1, 1, 100),
+    // });
+    // camera.projection = zm.perspectiveFovLh(std.math.degreesToRadians(90), 1, 1, 100);
+    // camera.view = zm.lookAtLh(.{ 0, 0, -5, 0 }, .{ 0, 0, 0, 0 }, .{ 0, 1, 0, 0 });
     self.batcher = try Batcher.init(
         self.gpu_device,
         self.window,
+        camera,
     );
     self.duck_texture = self.batcher.register_texture(image_data);
     c.SDL_DestroySurface(image_data);
@@ -321,10 +331,39 @@ fn draw(self: *Engine) void {
     const t: f32 = @as(f32, @floatFromInt(self.current_frame)) / 600;
 
     const pos: [3]f32 = .{ @sin(t * 10) * 5, @sin(t) * 4, 0 };
+    _ = pos; // autofix
     // const pos: [3]f32 = .{ 0, 0, 0 };
 
     self.batcher.reset();
-    self.batcher.add(.{ .pos = pos, .rot = 0, .scale = .{ 1, 1 } }, self.duck_texture);
+    // for (0..100) |i| {
+    //     // sum3 += i;
+    //     self.batcher.add(.{ .pos = pos, .rot = @sin(@as(f32, @floatFromInt(i * 10)) * t) * std.math.pi, .scale = .{ 1, 1 } }, self.duck_texture);
+    // }
+    // self.batcher.add(.{ .pos = pos, .rot = @sin(t * 10) * std.math.pi, .scale = .{ 1, 1 } }, self.duck_texture);
+    // Draw duck textures in a square grid
+    // const grid_size: usize = @round(@sqrt(1000000.0));
+
+    const grid_size: usize = 10;
+
+    const spacing: f32 = 1;
+    const scale: f32 = 1;
+    for (0..grid_size) |y| {
+        for (0..grid_size) |x| {
+            const xi: isize = @intCast(x);
+            const yi: isize = @intCast(y);
+            const pos_x = @as(f32, @floatFromInt(xi - grid_size / 2)) * spacing;
+            const pos_y = @as(f32, @floatFromInt(yi - grid_size / 2)) * spacing;
+            self.batcher.add(
+                .{
+                    .pos = .{ pos_x, pos_y, 0 },
+                    .rot = t,
+                    .scale = .{ scale, scale },
+                },
+                self.duck_texture,
+            );
+        }
+    }
+
     self.batcher.draw(command_buffer, target_info);
     // const render_pass_ptr = c.SDL_BeginGPURenderPass(command_buffer, &target_info, 1, null);
     // if (render_pass_ptr != null) {
@@ -385,6 +424,31 @@ fn update(self: *Engine) void {
 
         if (event.type == c.SDL_EVENT_WINDOW_CLOSE_REQUESTED and event.window.windowID == c.SDL_GetWindowID(self.window)) {
             self.done = true;
+        }
+
+        // inputs
+        if (event.type == c.SDL_EVENT_KEY_DOWN) {
+            if (event.key.scancode == c.SDL_SCANCODE_A) {
+                self.batcher.camera.translate(.{ -1, 0 });
+            }
+            if (event.key.scancode == c.SDL_SCANCODE_D) {
+                self.batcher.camera.translate(.{ 1, 0 });
+            }
+            if (event.key.scancode == c.SDL_SCANCODE_W) {
+                self.batcher.camera.translate(.{ 0, 1 });
+            }
+            if (event.key.scancode == c.SDL_SCANCODE_S) {
+                self.batcher.camera.translate(.{ 0, -1 });
+            }
+            if (event.key.scancode == c.SDL_SCANCODE_Q) {
+                self.batcher.camera.zoom(-0.1);
+            }
+            if (event.key.scancode == c.SDL_SCANCODE_E) {
+                self.batcher.camera.zoom(0.1);
+            }
+            if (event.key.scancode == c.SDL_SCANCODE_R) {
+                self.batcher.camera.rotate(std.math.degreesToRadians(10));
+            }
         }
     }
     if ((c.SDL_GetWindowFlags(self.window) & c.SDL_WINDOW_MINIMIZED) != 0) {

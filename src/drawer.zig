@@ -2,9 +2,11 @@ const c = @import("cmix.zig");
 const std = @import("std");
 const mk = @import("mkmix.zig");
 const zm = @import("include/zmath.zig");
+const Camera = @import("camera.zig");
 const Self = @This();
 
-const MAX_SPRITES = 69;
+// const MAX_SPRITES = 4 * 1000 * 1000 * 1000 / @sizeOf(SpriteParams);
+const MAX_SPRITES = 1000 * 1000;
 
 const SpriteParams = extern struct {
     pos: [3]f32 align(1),
@@ -26,13 +28,20 @@ index_buffer: *c.SDL_GPUBuffer,
 sampler: *c.SDL_GPUSampler,
 
 clear_color: c.ImVec4 = .{ .x = 0.39, .y = 0.58, .z = 0.93, .w = 1.00 }, // clear color for rendering
+camera: Camera = .default,
 
 num_added: u32 = 0,
 // registered_textures: std.ArrayList(c.SDL_Texture),
 
 texture_map: std.AutoHashMap(*c.SDL_GPUTexture, u32),
 
-pub fn init(device: *c.SDL_GPUDevice, window: *c.SDL_Window) !Self {
+pub fn init(device: *c.SDL_GPUDevice, window: *c.SDL_Window, camera: ?Camera) !Self {
+    var cam: Camera = undefined; // autofix
+    if (camera) |notnullcam| {
+        cam = notnullcam;
+    } else {
+        cam = .default;
+    }
 
     // shaders
     const vertshader = try mk.load_shader(device, "tringlesprite.vert.spv", 0, 1, 1, 0);
@@ -191,6 +200,7 @@ pub fn init(device: *c.SDL_GPUDevice, window: *c.SDL_Window) !Self {
         .index_buffer = index_buffer,
         .sampler = sampler,
         .texture_map = std.AutoHashMap(*c.SDL_GPUTexture, u32).init(mk.alloc),
+        .camera = cam,
     };
 }
 
@@ -276,21 +286,24 @@ pub fn draw(self: *Self, cmd_buf: *c.SDL_GPUCommandBuffer, target_info: c.SDL_GP
     c.SDL_BindGPUVertexBuffers(render_pass, 0, &(c.SDL_GPUBufferBinding){ .buffer = self.vertex_buffer, .offset = 0 }, 1);
     c.SDL_BindGPUIndexBuffer(render_pass, &(c.SDL_GPUBufferBinding){ .buffer = self.index_buffer, .offset = 0 }, c.SDL_GPU_INDEXELEMENTSIZE_16BIT);
 
-    var matrix_uniform = zm.mulMats(&.{
-        comptime zm.lookAtLh(.{ 0, 0, -5, 0 }, .{ 0, 0, 0, 0 }, .{ 0, 1, 0, 0 }),
-        comptime zm.perspectiveFovLh(std.math.degreesToRadians(90), 1, 1, 100),
-    });
+    var matrix_uniform = self.camera.create_transform();
+    // zm.mulMats(&.{
+    //     comptime zm.lookAtLh(.{ 0, 0, -5, 0 }, .{ 0, 0, 0, 0 }, .{ 0, 1, 0, 0 }),
+    //     comptime zm.perspectiveFovLh(std.math.degreesToRadians(90), 1, 1, 100),
+    // });
     // var matrix_uniform = zm.identity();
     const mat_size = @sizeOf(@TypeOf(matrix_uniform));
 
     c.SDL_PushGPUVertexUniformData(cmd_buf, 0, &matrix_uniform, mat_size);
 
     var iter = self.texture_map.iterator();
+    var total: u32 = 0;
     while (iter.next()) |next| {
         c.SDL_BindGPUFragmentSamplers(render_pass, 0, &(c.SDL_GPUTextureSamplerBinding){ .texture = next.key_ptr.*, .sampler = self.sampler }, 1);
 
         // c.SDL_DrawGPUIndexedPrimitives(render_pass, 4, next.value_ptr.*, 0, 0, 0);
-        c.SDL_DrawGPUPrimitives(render_pass, 4, next.value_ptr.*, 0, 0);
+        c.SDL_DrawGPUPrimitives(render_pass, 4, next.value_ptr.*, 0, total);
+        total += next.value_ptr.*;
     }
 
     c.SDL_EndGPURenderPass(render_pass);
