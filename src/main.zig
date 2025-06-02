@@ -5,5 +5,5 @@ const e = @import("mlemgine.zig");
 
 pub fn main() !void {
     var mlem = try e.init();
-    mlem.run();
+    try mlem.run();
 }

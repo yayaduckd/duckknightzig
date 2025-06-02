@@ -44,6 +44,13 @@ pub fn sdlr(success: bool) !void {
     }
 }
 
+pub fn sdlv(value: anytype) !@TypeOf(value.?) {
+    if (value == null) {
+        return error.MkSDLVNullError;
+    }
+    return value.?;
+}
+
 pub fn fatal_sdl_error(comptime msg: []const u8) !void {
     const err_str_ptr = c.SDL_GetError();
     if (err_str_ptr) |raw_err_str| {
