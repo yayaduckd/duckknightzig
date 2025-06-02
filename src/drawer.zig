@@ -6,7 +6,7 @@ const Camera = @import("camera.zig");
 const Self = @This();
 
 // const MAX_SPRITES = 4 * 1000 * 1000 * 1000 / @sizeOf(SpriteParams);
-const MAX_SPRITES = 1000 * 1000;
+const MAX_SPRITES = 1000 * 1000 * @sizeOf(SpriteParams);
 
 const SpriteParams = extern struct {
     pos: [3]f32 align(1),
@@ -114,7 +114,7 @@ pub fn register_texture(self: *Self, image_data: *c.SDL_Surface) *c.SDL_GPUTextu
         &(c.SDL_GPUTransferBufferCreateInfo){ .usage = c.SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD, .size = @intCast(image_data.w * image_data.h * 4) },
     );
 
-    const texture_transfer_ptr = c.SDL_MapGPUTransferBuffer(self.gpu_device, texture_transfer_buffer, false);
+    const texture_transfer_ptr = c.SDL_MapGPUTransferBuffer(self.gpu_device, texture_transfer_buffer, true);
     _ = c.SDL_memcpy(texture_transfer_ptr, image_data.pixels, @intCast(image_data.w * image_data.h * 4));
     c.SDL_UnmapGPUTransferBuffer(self.gpu_device, texture_transfer_buffer);
     // Upload the transfer data to the GPU resources
@@ -123,7 +123,7 @@ pub fn register_texture(self: *Self, image_data: *c.SDL_Surface) *c.SDL_GPUTextu
     c.SDL_UploadToGPUTexture(copy_pass, &(c.SDL_GPUTextureTransferInfo){
         .transfer_buffer = texture_transfer_buffer,
         .offset = 0, //* Zeroes out the rest */
-    }, &(c.SDL_GPUTextureRegion){ .texture = texture, .w = @intCast(image_data.w), .h = @intCast(image_data.h), .d = 1 }, false);
+    }, &(c.SDL_GPUTextureRegion){ .texture = texture, .w = @intCast(image_data.w), .h = @intCast(image_data.h), .d = 1 }, true);
 
     c.SDL_DestroySurface(image_data);
     c.SDL_EndGPUCopyPass(copy_pass);
@@ -153,7 +153,7 @@ pub fn begin(self: *Self) void {
 
 pub fn end(self: *Self) void {
     var iter = self.texture_map.iterator();
-    const texture_transfer_ptr = c.SDL_MapGPUTransferBuffer(self.gpu_device, self.transfer_buffer, false);
+    const transfer_ptr = c.SDL_MapGPUTransferBuffer(self.gpu_device, self.transfer_buffer, true);
     var total: u32 = 0;
     while (iter.next()) |next| {
         const params_ptr = next.value_ptr.*.items.ptr;
@@ -161,12 +161,13 @@ pub fn end(self: *Self) void {
         const params_num_bytes = params_len * @sizeOf(SpriteParams);
 
         _ = c.SDL_memcpy(
-            @ptrFromInt(@intFromPtr(texture_transfer_ptr) + total * @sizeOf(SpriteParams)),
+            @ptrFromInt(@intFromPtr(transfer_ptr) + total * @sizeOf(SpriteParams)),
             params_ptr,
             params_num_bytes,
         );
         total += params_len;
     }
+    c.SDL_UnmapGPUTransferBuffer(self.gpu_device, self.transfer_buffer);
 }
 
 pub fn copy(self: *Self, copy_pass: *c.SDL_GPUCopyPass) void {
@@ -176,9 +177,9 @@ pub fn copy(self: *Self, copy_pass: *c.SDL_GPUCopyPass) void {
         &(c.SDL_GPUBufferRegion){
             .buffer = self.storage_buffer,
             .offset = 0,
-            .size = @sizeOf(SpriteParams) * MAX_SPRITES,
+            .size = @sizeOf(SpriteParams) * self.num_added,
         },
-        false,
+        true, // enable cycling of the batcher buffer
     );
 }
 
@@ -193,8 +194,7 @@ pub fn render(self: *Self, cmd_buf: *c.SDL_GPUCommandBuffer, render_pass: *c.SDL
     c.SDL_PushGPUVertexUniformData(cmd_buf, 0, &matrix_uniform, mat_size);
 
     var iter = self.texture_map.iterator();
-    // const texture_transfer_ptr = c.SDL_MapGPUTransferBuffer(self.gpu_device, self.transfer_buffer, false);
-    // _ = texture_transfer_ptr; // autofix
+
     var total: u32 = 0;
     while (iter.next()) |next| {
         const params_len: u32 = @intCast(next.value_ptr.*.items.len);

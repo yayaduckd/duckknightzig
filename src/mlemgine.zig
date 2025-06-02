@@ -131,7 +131,7 @@ pub fn render(self: *Engine, command_buffer: *c.SDL_GPUCommandBuffer) !void {
         .store_op = c.SDL_GPU_STOREOP_STORE, // store render target contents
         .mip_level = 0,
         .layer_or_depth_plane = 0,
-        .cycle = false,
+        .cycle = true, // safe to cycle as we are re-drawing each frame from scratch (loadop == clear)
         // other target_info fields use default zero-initialization
     };
 
@@ -167,6 +167,11 @@ fn imgui_frame(self: *Engine) !void {
 fn draw_to_screen(self: *Engine) !void {
     const command_buffer = try mk.sdlv(c.SDL_AcquireGPUCommandBuffer(self.gpu_device));
 
+    // get swapchain texture early
+    // var swapchain_texture_ptr: ?*c.SDL_GPUTexture = null;
+    // try mk.sdlr(c.SDL_AcquireGPUSwapchainTexture(command_buffer, self.window, &swapchain_texture_ptr, null, null));
+    // const swapchain_texture = try mk.sdlv(swapchain_texture_ptr);
+
     try self.imgui_frame();
 
     try self.copy(command_buffer);
@@ -191,7 +196,7 @@ pub fn run(self: *Engine) !void {
 fn draw(self: *Engine) !void {
     self.batcher.begin();
     const t: f32 = @as(f32, @floatFromInt(self.current_frame)) / 600;
-    const grid_size: usize = 10;
+    const grid_size: usize = 700;
     const spacing: f32 = 1;
     const scale: f32 = 1;
     for (0..grid_size) |y| {
