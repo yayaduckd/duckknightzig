@@ -40,7 +40,7 @@ pub fn create_transform(self: *Camera) zm.Mat {
     return zm.transpose(zm.mulMats(&.{
         zm.rotationZ(self.angle),
         zm.scaling(self.scale, self.scale, 0),
-        zm.lookAtLh(.{ self.pos[0] + self.lookat_origin_offset[0], self.pos[1] + self.lookat_origin_offset[1], -5, 0 }, .{ self.pos[0], self.pos[1], 0, 0 }, .{ 0, 1, 0, 0 }),
+        zm.lookAtLh(.{ self.pos[0] + self.lookat_origin_offset[0], self.pos[1] + self.lookat_origin_offset[1], -20, 0 }, .{ self.pos[0], self.pos[1], 0, 0 }, .{ 0, 1, 0, 0 }),
         self.projection,
     }));
 }

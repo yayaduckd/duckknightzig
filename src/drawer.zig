@@ -27,10 +27,10 @@ camera: Camera = .default,
 
 num_added: u32 = 0,
 
-texture_map: std.AutoHashMap(*c.SDL_GPUTexture, u32),
+texture_map: std.AutoHashMap(*c.SDL_GPUTexture, std.ArrayList(SpriteParams)),
 
 pub fn init(device: *c.SDL_GPUDevice, window: *c.SDL_Window, camera: ?Camera) !Self {
-    var cam: Camera = undefined; // autofix
+    var cam: Camera = undefined;
     if (camera) |notnullcam| {
         cam = notnullcam;
     } else {
@@ -92,7 +92,7 @@ pub fn init(device: *c.SDL_GPUDevice, window: *c.SDL_Window, camera: ?Camera) !S
         .storage_buffer = storage_buffer,
         .pipeline = pipeline,
         .sampler = sampler,
-        .texture_map = std.AutoHashMap(*c.SDL_GPUTexture, u32).init(mk.alloc),
+        .texture_map = std.AutoHashMap(*c.SDL_GPUTexture, std.ArrayList(SpriteParams)).init(mk.alloc),
         .camera = cam,
     };
 }
@@ -132,23 +132,33 @@ pub fn register_texture(self: *Self, image_data: *c.SDL_Surface) *c.SDL_GPUTextu
 }
 
 pub fn add(self: *Self, params: SpriteParams, texture: *c.SDL_GPUTexture) void {
-    const texture_transfer_ptr = c.SDL_MapGPUTransferBuffer(self.gpu_device, self.transfer_buffer, false);
-    _ = c.SDL_memcpy(
-        @ptrFromInt(@intFromPtr(texture_transfer_ptr) + self.num_added * @sizeOf(SpriteParams)),
-        &params,
-        @sizeOf(SpriteParams),
-    );
+
     // std.log.debug("{x}", .{texture});
     self.num_added += 1;
     if (self.texture_map.contains(texture)) {
-        const val = self.texture_map.get(texture).?;
-        self.texture_map.put(texture, val + 1) catch unreachable;
+        self.texture_map.getPtr(texture).?.append(params) catch @panic("oom");
     } else {
-        self.texture_map.put(texture, 1) catch unreachable;
+        self.texture_map.put(texture, std.ArrayList(SpriteParams).init(mk.alloc)) catch @panic("oom");
+        self.texture_map.getPtr(texture).?.append(params) catch @panic("oom");
     }
 }
 
 pub fn copy(self: *Self, copy_pass: *c.SDL_GPUCopyPass) void {
+    var iter = self.texture_map.iterator();
+    const texture_transfer_ptr = c.SDL_MapGPUTransferBuffer(self.gpu_device, self.transfer_buffer, false);
+    var total: u32 = 0;
+    while (iter.next()) |next| {
+        const params_ptr = next.value_ptr.*.items.ptr;
+        const params_len: u32 = @intCast(next.value_ptr.*.items.len);
+        const params_num_bytes = params_len * @sizeOf(SpriteParams);
+
+        _ = c.SDL_memcpy(
+            @ptrFromInt(@intFromPtr(texture_transfer_ptr) + total * @sizeOf(SpriteParams)),
+            params_ptr,
+            params_num_bytes,
+        );
+        total += params_len;
+    }
     c.SDL_UploadToGPUBuffer(
         copy_pass,
         &(c.SDL_GPUTransferBufferLocation){ .transfer_buffer = self.transfer_buffer, .offset = 0 },
@@ -172,16 +182,32 @@ pub fn render(self: *Self, cmd_buf: *c.SDL_GPUCommandBuffer, render_pass: *c.SDL
     c.SDL_PushGPUVertexUniformData(cmd_buf, 0, &matrix_uniform, mat_size);
 
     var iter = self.texture_map.iterator();
+    // const texture_transfer_ptr = c.SDL_MapGPUTransferBuffer(self.gpu_device, self.transfer_buffer, false);
+    // _ = texture_transfer_ptr; // autofix
     var total: u32 = 0;
     while (iter.next()) |next| {
-        c.SDL_BindGPUFragmentSamplers(render_pass, 0, &(c.SDL_GPUTextureSamplerBinding){ .texture = next.key_ptr.*, .sampler = self.sampler }, 1);
+        const params_len: u32 = @intCast(next.value_ptr.*.items.len);
 
-        c.SDL_DrawGPUPrimitives(render_pass, 4, next.value_ptr.*, 0, total);
-        total += next.value_ptr.*;
+        c.SDL_BindGPUFragmentSamplers(render_pass, 0, &(c.SDL_GPUTextureSamplerBinding){ .texture = next.key_ptr.*, .sampler = self.sampler }, 1);
+        c.SDL_DrawGPUPrimitives(render_pass, 4, params_len, 0, total);
+
+        total += params_len;
     }
 }
 
 pub fn reset(self: *Self) void {
     self.num_added = 0;
-    self.texture_map.clearRetainingCapacity();
+    var iter = self.texture_map.iterator();
+    while (iter.next()) |next| {
+        next.value_ptr.*.clearRetainingCapacity();
+    }
+    // self.texture_map.clearRetainingCapacity();
+}
+
+pub fn deinit(self: *Self) void {
+    var iter = self.texture_map.iterator();
+    while (iter.next()) |next| {
+        next.value_ptr.*.clearAndFree();
+    }
+    self.texture_map.clearAndFree();
 }

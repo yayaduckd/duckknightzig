@@ -18,6 +18,7 @@ gpu_device: *c.SDL_GPUDevice = undefined,
 // index_buffer: *c.SDL_GPUBuffer = undefined,
 
 duck_texture: *c.SDL_GPUTexture = undefined,
+debug_texture: *c.SDL_GPUTexture = undefined,
 // duck_sampler: *c.SDL_GPUSampler = undefined,
 
 clear_color: c.ImVec4 = .{ .x = 0.39, .y = 0.58, .z = 0.93, .w = 1.00 }, // clear color for rendering
@@ -183,6 +184,14 @@ fn draw(self: *Engine) !void {
                 },
                 self.duck_texture,
             );
+            self.batcher.add(
+                .{
+                    .pos = .{ pos_x + 0.5 * spacing, pos_y + 0.5, 0 },
+                    .rot = t,
+                    .scale = .{ scale / 2, scale / 2 },
+                },
+                self.debug_texture,
+            );
         }
     }
 
@@ -209,8 +218,12 @@ pub fn run(self: *Engine) !void {
 }
 
 fn load_content(self: *Engine) !void {
-    const image_data = try mk.load_image("mduck.png", 4);
+    var image_data = try mk.load_image("mduck.png", 4);
     self.duck_texture = self.batcher.register_texture(image_data);
+    c.SDL_DestroySurface(image_data);
+
+    image_data = try mk.load_image("debug.png", 4);
+    self.debug_texture = self.batcher.register_texture(image_data);
     c.SDL_DestroySurface(image_data);
 }
 
@@ -229,16 +242,16 @@ fn update(self: *Engine) void {
         // inputs
         if (event.type == c.SDL_EVENT_KEY_DOWN) {
             if (event.key.scancode == c.SDL_SCANCODE_A) {
-                self.batcher.camera.translate(.{ -1, 0 });
+                self.batcher.camera.translate(.{ -0.1, 0 });
             }
             if (event.key.scancode == c.SDL_SCANCODE_D) {
-                self.batcher.camera.translate(.{ 1, 0 });
+                self.batcher.camera.translate(.{ 0.1, 0 });
             }
             if (event.key.scancode == c.SDL_SCANCODE_W) {
-                self.batcher.camera.translate(.{ 0, 1 });
+                self.batcher.camera.translate(.{ 0, 0.1 });
             }
             if (event.key.scancode == c.SDL_SCANCODE_S) {
-                self.batcher.camera.translate(.{ 0, -1 });
+                self.batcher.camera.translate(.{ 0, -0.1 });
             }
             if (event.key.scancode == c.SDL_SCANCODE_Q) {
                 self.batcher.camera.zoom(-0.1);
