@@ -110,6 +110,14 @@ pub fn deinit(self: *Engine) void {
     self.cleanup();
 }
 
+fn push_uniform_buffers(self: *Engine, command_buffer: *c.SDL_GPUCommandBuffer) !void {
+    var matrix_uniform = self.batcher.camera.create_transform();
+    const mat_size = @sizeOf(@TypeOf(matrix_uniform));
+
+    // push vp matrix to position 0
+    c.SDL_PushGPUVertexUniformData(command_buffer, 0, &matrix_uniform, mat_size);
+}
+
 fn copy(self: *Engine, command_buffer: *c.SDL_GPUCommandBuffer) !void {
     const copy_pass = try mk.sdlv(c.SDL_BeginGPUCopyPass(command_buffer));
     self.batcher.copy(copy_pass);
@@ -137,7 +145,7 @@ pub fn render(self: *Engine, command_buffer: *c.SDL_GPUCommandBuffer) !void {
 
     const render_pass = try mk.sdlv(c.SDL_BeginGPURenderPass(command_buffer, &target_info, 1, null));
 
-    self.batcher.render(command_buffer, render_pass);
+    self.batcher.render(render_pass);
 
     c.ImGui_ImplSDLGPU3_RenderDrawData(self.im_draw_data, command_buffer, render_pass, null); // render imgui draw data using the sdlgpu backend commands
     c.SDL_EndGPURenderPass(render_pass);
@@ -153,9 +161,27 @@ fn imgui_frame(self: *Engine) !void {
     if (show_demo_window) {
         c.igShowDemoWindow(&show_demo_window);
     }
+
+    var show_mlem_window = true;
+    c.igSetNextWindowSize(.{ .x = 200, .y = 200 }, c.ImGuiCond_Once);
+    if (!c.igBegin("mlamOS", &show_mlem_window, 0)) {
+        c.igEnd();
+        c.igRender();
+        const draw_data = try mk.sdlv(c.igGetDrawData());
+        if (draw_data.*.DisplaySize.x <= 0.0 or draw_data.*.DisplaySize.y <= 0.0) {
+            std.time.sleep(16 * 1000 * 1000); // if draw area is 0 or negative, skip rendering cycle
+            return;
+        }
+        self.im_draw_data = draw_data;
+        return;
+    }
+    c.igPushItemWidth(c.igGetFontSize() * -12);
+    c.igText(&mk.frame_print_buffer);
+    mk.reset_frame_print_buffer();
+    c.igEnd();
+
     // rendering phase
     c.igRender();
-
     const draw_data = try mk.sdlv(c.igGetDrawData());
     if (draw_data.*.DisplaySize.x <= 0.0 or draw_data.*.DisplaySize.y <= 0.0) {
         std.time.sleep(16 * 1000 * 1000); // if draw area is 0 or negative, skip rendering cycle
@@ -174,6 +200,7 @@ fn draw_to_screen(self: *Engine) !void {
 
     try self.imgui_frame();
 
+    try self.push_uniform_buffers(command_buffer);
     try self.copy(command_buffer);
     try self.render(command_buffer);
 
@@ -196,7 +223,7 @@ pub fn run(self: *Engine) !void {
 fn draw(self: *Engine) !void {
     self.batcher.begin();
     const t: f32 = @as(f32, @floatFromInt(self.current_frame)) / 600;
-    const grid_size: usize = 700;
+    const grid_size: usize = 10;
     const spacing: f32 = 1;
     const scale: f32 = 1;
     for (0..grid_size) |y| {
@@ -275,11 +302,18 @@ fn update(self: *Engine) void {
 
         // if (event.type == c.SDL_EVENT_MOUSE_MOTION) {
         //     const x = event.motion.xrel;
+        //     _ = x; // autofix
         //     const y = event.motion.yrel;
-        //     self.batcher.camera.origin_offset(.{ x, y });
-        //     std.log.debug("motion x {d} y {d} offs {d}", .{ x, y, self.batcher.camera.lookat_origin_offset });
+        //     _ = y; // autofix
+        //     // self.batcher.camera.origin_offset(.{ x, y });
+        //     // mk.frame_print("motion x {d} y {d} offs {d}\n", .{ x, y, self.batcher.camera.lookat_origin_offset });
         // }
     }
+    var x: f32 = 0;
+    var y: f32 = 0;
+    _ = c.SDL_GetMouseState(&x, &y);
+    mk.frame_print("mouse x {d} y {d}\n", .{ x, y });
+
     if ((c.SDL_GetWindowFlags(self.window) & c.SDL_WINDOW_MINIMIZED) != 0) {
         std.time.sleep(16 * 1000 * 1000); // if window is minimized, delay to reduce cpu usage
         return;

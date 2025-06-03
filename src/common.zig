@@ -46,6 +46,12 @@ pub fn sdlr(success: bool) !void {
 
 pub fn sdlv(value: anytype) !@TypeOf(value.?) {
     if (value == null) {
+        const err_str_ptr = c.SDL_GetError();
+        if (err_str_ptr) |raw_err_str| {
+            std.log.err("SDL Error: {s}", .{std.mem.sliceTo(raw_err_str, 0)});
+        } else {
+            std.log.err("(no sdl error message available)", .{});
+        }
         return error.MkSDLVNullError;
     }
     return value.?;
@@ -168,4 +174,16 @@ pub fn load_image(filename: []const u8, desired_channels: u8) !*c.SDL_Surface {
     }
 
     return result.?;
+}
+
+pub var frame_print_buffer: [8192]u8 = undefined;
+var frame_print_offset: usize = 0;
+pub fn frame_print(comptime fmt: []const u8, args: anytype) void {
+    const slice = std.fmt.bufPrint(frame_print_buffer[frame_print_offset..], fmt, args) catch @panic("out of frame print space");
+    frame_print_offset += slice.len;
+}
+
+pub fn reset_frame_print_buffer() void {
+    frame_print_offset = 0;
+    mk.frame_print_buffer = std.mem.zeroes([8192]u8);
 }

@@ -183,15 +183,10 @@ pub fn copy(self: *Self, copy_pass: *c.SDL_GPUCopyPass) void {
     );
 }
 
-pub fn render(self: *Self, cmd_buf: *c.SDL_GPUCommandBuffer, render_pass: *c.SDL_GPURenderPass) void {
+pub fn render(self: *Self, render_pass: *c.SDL_GPURenderPass) void {
     c.SDL_BindGPUVertexStorageBuffers(render_pass, 0, &self.storage_buffer, 1);
 
     c.SDL_BindGPUGraphicsPipeline(render_pass, self.pipeline);
-
-    var matrix_uniform = self.camera.create_transform();
-    const mat_size = @sizeOf(@TypeOf(matrix_uniform));
-
-    c.SDL_PushGPUVertexUniformData(cmd_buf, 0, &matrix_uniform, mat_size);
 
     var iter = self.texture_map.iterator();
 
