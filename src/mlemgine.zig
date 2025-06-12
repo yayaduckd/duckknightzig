@@ -1,12 +1,22 @@
 const c = @import("cmix.zig");
 const Batcher = @import("drawer.zig");
-const mk = @import("common.zig");
+const mk = @import("mkmix.zig");
 const cam = @import("camera.zig");
 
 const std = @import("std");
 const zm = @import("include/zmath.zig");
 
+const log = std.log.scoped(.engine);
+
 const Engine = @This();
+
+pub const EngineImpl = struct {
+    init_fn: *const fn (self: *Engine) anyerror!void,
+    draw_fn: *const fn (self: *Engine) anyerror!void,
+    update_fn: *const fn (self: *Engine) anyerror!void,
+};
+
+impl: EngineImpl,
 
 done: bool = false,
 window: *c.SDL_Window = undefined,
@@ -25,9 +35,11 @@ clear_color: c.ImVec4 = .{ .x = 0.39, .y = 0.58, .z = 0.93, .w = 1.00 }, // clea
 
 current_frame: u64 = 0,
 
-batcher: Batcher = undefined,
+// batcher: Batcher = undefined,
+renderables: std.ArrayList(mk.Renderable) = undefined,
 
 im_draw_data: ([*c]c.struct_ImDrawData) = undefined,
+camera: @import("camera.zig") = undefined,
 
 fn cleanup(self: *Engine) void {
     c.ImGui_ImplSDLGPU3_Shutdown();
@@ -62,8 +74,8 @@ fn init_graphics(self: *Engine) !void {
     try mk.sdlr(c.SDL_SetGPUSwapchainParameters(self.gpu_device, self.window, c.SDL_GPU_SWAPCHAINCOMPOSITION_SDR, c.SDL_GPU_PRESENTMODE_MAILBOX));
 }
 
-pub fn init() !Engine {
-    var self = Engine{};
+pub fn init(impl: EngineImpl) !Engine {
+    var self = Engine{ .impl = impl };
 
     // setup general stuff
     try self.init_graphics();
@@ -95,13 +107,15 @@ pub fn init() !Engine {
     }
 
     const camera: cam = .default;
-    self.batcher = try Batcher.init(
-        self.gpu_device,
-        self.window,
-        camera,
-    );
-    try self.load_content();
+    self.camera = camera;
+    self.renderables = std.ArrayList(mk.Renderable).init(mk.alloc);
+    // try self.renderables.append(mk.Renderable{
+    //     .batcher = try Batcher.init(self),
+    // });
 
+    // try self.load_content();
+
+    try self.impl.init_fn(&self);
     return self;
 }
 
@@ -111,7 +125,7 @@ pub fn deinit(self: *Engine) void {
 }
 
 fn push_uniform_buffers(self: *Engine, command_buffer: *c.SDL_GPUCommandBuffer) !void {
-    var matrix_uniform = self.batcher.camera.create_transform();
+    var matrix_uniform = self.camera.create_transform();
     const mat_size = @sizeOf(@TypeOf(matrix_uniform));
 
     // push vp matrix to position 0
@@ -120,7 +134,12 @@ fn push_uniform_buffers(self: *Engine, command_buffer: *c.SDL_GPUCommandBuffer) 
 
 fn copy(self: *Engine, command_buffer: *c.SDL_GPUCommandBuffer) !void {
     const copy_pass = try mk.sdlv(c.SDL_BeginGPUCopyPass(command_buffer));
-    self.batcher.copy(copy_pass);
+    // self.batcher.copy(copy_pass);
+
+    for (self.renderables.items) |*r| {
+        r.copy(copy_pass);
+    }
+
     c.SDL_EndGPUCopyPass(copy_pass);
 
     c.Imgui_ImplSDLGPU3_PrepareDrawData(self.im_draw_data, command_buffer); // prepare imgui draw data for sdlgpu backend
@@ -130,7 +149,10 @@ fn copy(self: *Engine, command_buffer: *c.SDL_GPUCommandBuffer) !void {
 pub fn render(self: *Engine, command_buffer: *c.SDL_GPUCommandBuffer) !void {
     var swapchain_texture_ptr: ?*c.SDL_GPUTexture = null;
     try mk.sdlr(c.SDL_AcquireGPUSwapchainTexture(command_buffer, self.window, &swapchain_texture_ptr, null, null));
-    const swapchain_texture = try mk.sdlv(swapchain_texture_ptr);
+    const swapchain_texture = swapchain_texture_ptr orelse {
+        log.debug("swapchain texture couldn't be aquired", .{});
+        return;
+    };
 
     const target_info: c.SDL_GPUColorTargetInfo = .{
         .texture = swapchain_texture,
@@ -145,7 +167,10 @@ pub fn render(self: *Engine, command_buffer: *c.SDL_GPUCommandBuffer) !void {
 
     const render_pass = try mk.sdlv(c.SDL_BeginGPURenderPass(command_buffer, &target_info, 1, null));
 
-    self.batcher.render(render_pass);
+    // self.batcher.render(render_pass);
+    for (self.renderables.items) |*r| {
+        r.render(render_pass);
+    }
 
     c.ImGui_ImplSDLGPU3_RenderDrawData(self.im_draw_data, command_buffer, render_pass, null); // render imgui draw data using the sdlgpu backend commands
     c.SDL_EndGPURenderPass(render_pass);
@@ -201,7 +226,9 @@ fn draw_to_screen(self: *Engine) !void {
     try self.imgui_frame();
 
     try self.push_uniform_buffers(command_buffer);
+
     try self.copy(command_buffer);
+
     try self.render(command_buffer);
 
     _ = c.SDL_SubmitGPUCommandBuffer(command_buffer); // submit gpu commands for execution
@@ -212,56 +239,28 @@ pub fn run(self: *Engine) !void {
     while (!self.done) {
         const t = std.time.nanoTimestamp();
         if (t - prev_t < 1000000000 / 240) continue;
-        self.update(); // update game logic
-        try self.draw(); // draw sprites with xna-type interface
+        // self.update(); // update game logic
+        try self.impl.update_fn(self);
+        self.update();
+        try self.impl.draw_fn(self);
+
+        // try self.draw(); // draw sprites with xna-type interface
         try self.draw_to_screen(); // sdl gpu render logic
+
         self.current_frame += 1;
         prev_t = t;
     }
 }
 
-fn draw(self: *Engine) !void {
-    self.batcher.begin();
-    const t: f32 = @as(f32, @floatFromInt(self.current_frame)) / 600;
-    const grid_size: usize = 10;
-    const spacing: f32 = 1;
-    const scale: f32 = 1;
-    for (0..grid_size) |y| {
-        for (0..grid_size) |x| {
-            const xi: isize = @intCast(x);
-            const yi: isize = @intCast(y);
-            const pos_x = @as(f32, @floatFromInt(xi - grid_size / 2)) * spacing;
-            const pos_y = @as(f32, @floatFromInt(yi - grid_size / 2)) * spacing;
-            self.batcher.add(
-                .{
-                    .pos = .{ pos_x, pos_y, 0 },
-                    .rot = t,
-                    .scale = .{ scale, scale },
-                },
-                self.duck_texture,
-            );
-            self.batcher.add(
-                .{
-                    .pos = .{ pos_x + 0.5 * spacing, pos_y + 0.5, 0 },
-                    .rot = t,
-                    .scale = .{ scale / 2, scale / 2 },
-                },
-                self.debug_texture,
-            );
-        }
-    }
-    self.batcher.end();
-}
+// fn load_content(self: *Engine) !void {
+//     var image_data = try mk.load_image("mduck.png", 4);
+//     self.duck_texture = self.renderables.items[0].batcher.register_texture(image_data);
+//     c.SDL_DestroySurface(image_data);
 
-fn load_content(self: *Engine) !void {
-    var image_data = try mk.load_image("mduck.png", 4);
-    self.duck_texture = self.batcher.register_texture(image_data);
-    c.SDL_DestroySurface(image_data);
-
-    image_data = try mk.load_image("debug.png", 4);
-    self.debug_texture = self.batcher.register_texture(image_data);
-    c.SDL_DestroySurface(image_data);
-}
+//     image_data = try mk.load_image("debug.png", 4);
+//     self.debug_texture = self.renderables.items[0].batcher.register_texture(image_data);
+//     c.SDL_DestroySurface(image_data);
+// }
 
 fn update(self: *Engine) void {
     var event: c.SDL_Event = undefined;
@@ -276,37 +275,28 @@ fn update(self: *Engine) void {
         }
 
         // inputs
-        if (event.type == c.SDL_EVENT_KEY_DOWN) {
-            if (event.key.scancode == c.SDL_SCANCODE_A) {
-                self.batcher.camera.translate(.{ -0.1, 0 });
-            }
-            if (event.key.scancode == c.SDL_SCANCODE_D) {
-                self.batcher.camera.translate(.{ 0.1, 0 });
-            }
-            if (event.key.scancode == c.SDL_SCANCODE_W) {
-                self.batcher.camera.translate(.{ 0, 0.1 });
-            }
-            if (event.key.scancode == c.SDL_SCANCODE_S) {
-                self.batcher.camera.translate(.{ 0, -0.1 });
-            }
-            if (event.key.scancode == c.SDL_SCANCODE_Q) {
-                self.batcher.camera.zoom(-0.1);
-            }
-            if (event.key.scancode == c.SDL_SCANCODE_E) {
-                self.batcher.camera.zoom(0.1);
-            }
-            if (event.key.scancode == c.SDL_SCANCODE_R) {
-                self.batcher.camera.rotate(std.math.degreesToRadians(10));
-            }
-        }
-
-        // if (event.type == c.SDL_EVENT_MOUSE_MOTION) {
-        //     const x = event.motion.xrel;
-        //     _ = x; // autofix
-        //     const y = event.motion.yrel;
-        //     _ = y; // autofix
-        //     // self.batcher.camera.origin_offset(.{ x, y });
-        //     // mk.frame_print("motion x {d} y {d} offs {d}\n", .{ x, y, self.batcher.camera.lookat_origin_offset });
+        // if (event.type == c.SDL_EVENT_KEY_DOWN) {
+        //     if (event.key.scancode == c.SDL_SCANCODE_A) {
+        //         self.batcher.camera.translate(.{ -0.1, 0 });
+        //     }
+        //     if (event.key.scancode == c.SDL_SCANCODE_D) {
+        //         self.batcher.camera.translate(.{ 0.1, 0 });
+        //     }
+        //     if (event.key.scancode == c.SDL_SCANCODE_W) {
+        //         self.batcher.camera.translate(.{ 0, 0.1 });
+        //     }
+        //     if (event.key.scancode == c.SDL_SCANCODE_S) {
+        //         self.batcher.camera.translate(.{ 0, -0.1 });
+        //     }
+        //     if (event.key.scancode == c.SDL_SCANCODE_Q) {
+        //         self.batcher.camera.zoom(-0.1);
+        //     }
+        //     if (event.key.scancode == c.SDL_SCANCODE_E) {
+        //         self.batcher.camera.zoom(0.1);
+        //     }
+        //     if (event.key.scancode == c.SDL_SCANCODE_R) {
+        //         self.batcher.camera.rotate(std.math.degreesToRadians(10));
+        //     }
         // }
     }
     var x: f32 = 0;

@@ -3,10 +3,13 @@ const std = @import("std");
 const mk = @import("mkmix.zig");
 const zm = @import("include/zmath.zig");
 const Camera = @import("camera.zig");
+const Engine = @import("mlemgine.zig");
+
 const Self = @This();
 
-// const MAX_SPRITES = 4 * 1000 * 1000 * 1000 / @sizeOf(SpriteParams);
-const MAX_SPRITES = 1000 * 1000 * @sizeOf(SpriteParams);
+const log = std.log.scoped(.batcher);
+
+const MAX_SPRITES = 1000;
 
 const SpriteParams = extern struct {
     pos: [3]f32 align(1),
@@ -29,13 +32,17 @@ num_added: u32 = 0,
 
 texture_map: std.AutoHashMap(*c.SDL_GPUTexture, std.ArrayList(SpriteParams)),
 
-pub fn init(device: *c.SDL_GPUDevice, window: *c.SDL_Window, camera: ?Camera) !Self {
-    var cam: Camera = undefined;
-    if (camera) |notnullcam| {
-        cam = notnullcam;
-    } else {
-        cam = .default;
-    }
+pub fn init(engine: Engine) !Self {
+    // device: *c.SDL_GPUDevice, window: *c.SDL_Window, camera: ?Camera
+    const device = engine.gpu_device;
+    const window = engine.window;
+    const cam = engine.camera;
+    // var cam: Camera = undefined;
+    // if (camera) |notnullcam| {
+    //     cam = notnullcam;
+    // } else {
+    //     cam = .default;
+    // }
 
     // shaders
     const vertshader = try mk.load_shader(device, "tringlesprite.vert.spv", 0, 1, 1, 0);
@@ -132,8 +139,6 @@ pub fn register_texture(self: *Self, image_data: *c.SDL_Surface) *c.SDL_GPUTextu
 }
 
 pub fn add(self: *Self, params: SpriteParams, texture: *c.SDL_GPUTexture) void {
-
-    // std.log.debug("{x}", .{texture});
     self.num_added += 1;
     if (self.texture_map.contains(texture)) {
         self.texture_map.getPtr(texture).?.append(params) catch @panic("oom");
@@ -170,7 +175,7 @@ pub fn end(self: *Self) void {
     c.SDL_UnmapGPUTransferBuffer(self.gpu_device, self.transfer_buffer);
 }
 
-pub fn copy(self: *Self, copy_pass: *c.SDL_GPUCopyPass) void {
+pub fn copy(self: *const Self, copy_pass: *c.SDL_GPUCopyPass) void {
     c.SDL_UploadToGPUBuffer(
         copy_pass,
         &(c.SDL_GPUTransferBufferLocation){ .transfer_buffer = self.transfer_buffer, .offset = 0 },
@@ -183,7 +188,7 @@ pub fn copy(self: *Self, copy_pass: *c.SDL_GPUCopyPass) void {
     );
 }
 
-pub fn render(self: *Self, render_pass: *c.SDL_GPURenderPass) void {
+pub fn render(self: *const Self, render_pass: *c.SDL_GPURenderPass) void {
     c.SDL_BindGPUVertexStorageBuffers(render_pass, 0, &self.storage_buffer, 1);
 
     c.SDL_BindGPUGraphicsPipeline(render_pass, self.pipeline);
