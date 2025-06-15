@@ -73,6 +73,36 @@ const ShaderType = enum {
     Compute,
 };
 
+pub fn load_shader_bytes(
+    device: *c.SDL_GPUDevice,
+    stage: c.SDL_GPUShaderStage,
+    bytes: []const u8,
+    sampler_count: u32,
+    uniform_buffer_count: u32,
+    storage_buffer_count: u32,
+    storage_texture_count: u32,
+) !*c.SDL_GPUShader {
+    const shader_info: c.SDL_GPUShaderCreateInfo = .{
+        .code = @ptrCast(bytes),
+        .code_size = bytes.len,
+        .entrypoint = "main",
+        .format = c.SDL_GPU_SHADERFORMAT_SPIRV,
+        .stage = stage,
+        .num_samplers = sampler_count,
+        .num_uniform_buffers = uniform_buffer_count,
+        .num_storage_buffers = storage_buffer_count,
+        .num_storage_textures = storage_texture_count,
+    };
+    const shaderOrNull = c.SDL_CreateGPUShader(device, &shader_info);
+    if (shaderOrNull) |shader| {
+        // c.SDL_free(code);
+        return shader;
+    }
+    std.log.debug("failed to create shader", .{});
+    // c.SDL_free(code);
+    return error.MkShaderCreationFailed;
+}
+
 pub fn load_shader(
     device: *c.SDL_GPUDevice,
     filename: []const u8,
@@ -94,26 +124,13 @@ pub fn load_shader(
 
     var code_size: usize = 0;
     const code = c.SDL_LoadFile(full_filepath, &code_size);
+    defer c.SDL_free(code);
 
-    const shader_info: c.SDL_GPUShaderCreateInfo = .{
-        .code = @ptrCast(code),
-        .code_size = code_size,
-        .entrypoint = "main",
-        .format = c.SDL_GPU_SHADERFORMAT_SPIRV,
-        .stage = stage,
-        .num_samplers = sampler_count,
-        .num_uniform_buffers = uniform_buffer_count,
-        .num_storage_buffers = storage_buffer_count,
-        .num_storage_textures = storage_texture_count,
-    };
-    const shaderOrNull = c.SDL_CreateGPUShader(device, &shader_info);
-    if (shaderOrNull) |shader| {
-        c.SDL_free(code);
-        return shader;
-    }
-    std.log.debug("failed to create shader", .{});
-    c.SDL_free(code);
-    return error.MkShaderCreationFailed;
+    var bytes: []u8 = undefined;
+    bytes.len = code_size;
+    bytes.ptr = @ptrCast(code);
+
+    return load_shader_bytes(device, stage, bytes, sampler_count, uniform_buffer_count, storage_buffer_count, storage_texture_count);
 }
 
 pub fn determine_shader_type(filename: []const u8) ShaderType {

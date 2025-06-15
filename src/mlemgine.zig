@@ -40,7 +40,7 @@ current_frame: u64 = 0,
 // batcher: Batcher = undefined,
 renderables: std.ArrayList(mk.Renderable) = undefined,
 
-im_draw_data: ([*c]c.struct_ImDrawData) = undefined,
+// im_draw_data: ([*c]c.struct_ImDrawData) = undefined,
 camera: @import("camera.zig") = undefined,
 
 fn cleanup(self: *Engine) void {
@@ -70,28 +70,6 @@ pub fn init(impl: EngineImpl) !Engine {
     try mk.sdlr(c.SDL_ClaimWindowForGPUDevice(self.gpu_device, self.window));
     try mk.sdlr(c.SDL_SetGPUSwapchainParameters(self.gpu_device, self.window, c.SDL_GPU_SWAPCHAINCOMPOSITION_SDR, c.SDL_GPU_PRESENTMODE_MAILBOX));
 
-    // setup imgui context and io
-    _ = c.igCreateContext(null);
-    const io = c.igGetIO_Nil();
-    io.*.ConfigFlags |= c.ImGuiConfigFlags_NavEnableKeyboard; // enable keyboard navigation
-    io.*.ConfigFlags |= c.ImGuiConfigFlags_NavEnableGamepad; // enable gamepad navigation
-    c.igStyleColorsDark(null);
-
-    // initialize imgui platform/renderer backends
-    // assuming sdl_bool return (0 for false) for imgui_implsdl3_initforsdlgpu
-    if (c.ImGui_ImplSDL3_InitForSDLGPU(self.window) == false) {
-        std.log.err("imgui_implsdl3_initforsdlgpu failed.", .{});
-    }
-    var init_info: c.ImGui_ImplSDLGPU3_InitInfo = .{
-        .Device = self.gpu_device,
-        .ColorTargetFormat = c.SDL_GetGPUSwapchainTextureFormat(self.gpu_device, self.window),
-        .MSAASamples = c.SDL_GPU_SAMPLECOUNT_1,
-        // other fields are zero-initialized by default
-    };
-    if (c.ImGui_ImplSDLGPU3_Init(&init_info) == false) {
-        std.log.err("imgui_implsdlgpu3_init failed.", .{});
-    }
-
     const camera: cam = .default;
     self.camera = camera;
     self.renderables = std.ArrayList(mk.Renderable).init(mk.alloc);
@@ -109,7 +87,9 @@ pub fn init(impl: EngineImpl) !Engine {
         .num_levels = 1,
         .usage = c.SDL_GPU_TEXTUREUSAGE_DEPTH_STENCIL_TARGET,
     }).?;
+
     try self.impl.init_fn(&self);
+
     return self;
 }
 
@@ -131,13 +111,12 @@ fn copy(self: *Engine, command_buffer: *c.SDL_GPUCommandBuffer) !void {
     // self.batcher.copy(copy_pass);
 
     for (self.renderables.items) |*r| {
-        r.copy(copy_pass);
+        r.copy(command_buffer, copy_pass);
     }
 
     c.SDL_EndGPUCopyPass(copy_pass);
 
-    c.Imgui_ImplSDLGPU3_PrepareDrawData(self.im_draw_data, command_buffer); // prepare imgui draw data for sdlgpu backend
-
+    // imgui.copy_stage(command_buffer);
 }
 
 pub fn render(self: *Engine, command_buffer: *c.SDL_GPUCommandBuffer) !void {
@@ -166,68 +145,26 @@ pub fn render(self: *Engine, command_buffer: *c.SDL_GPUCommandBuffer) !void {
         .clear_stencil = 0,
         .load_op = c.SDL_GPU_LOADOP_CLEAR,
         .store_op = c.SDL_GPU_STOREOP_STORE,
-        .stencil_load_op = c.SDL_GPU_LOADOP_CLEAR,
-        .stencil_store_op = c.SDL_GPU_STOREOP_STORE,
+        .stencil_load_op = c.SDL_GPU_LOADOP_DONT_CARE,
+        .stencil_store_op = c.SDL_GPU_STOREOP_DONT_CARE,
     };
     const render_pass = try mk.sdlv(c.SDL_BeginGPURenderPass(command_buffer, &target_info, 1, &depthStencilTargetInfo));
 
     // self.batcher.render(render_pass);
     for (self.renderables.items) |*r| {
-        r.render(render_pass);
+        r.render(command_buffer, render_pass);
     }
 
-    c.ImGui_ImplSDLGPU3_RenderDrawData(self.im_draw_data, command_buffer, render_pass, null); // render imgui draw data using the sdlgpu backend commands
+    // imgui.render_stage(command_buffer, render_pass);
     c.SDL_EndGPURenderPass(render_pass);
-}
-
-fn imgui_frame(self: *Engine) !void {
-    // start a new imgui frame
-    c.ImGui_ImplSDLGPU3_NewFrame();
-    c.ImGui_ImplSDL3_NewFrame();
-    c.igNewFrame();
-    // show imgui's built-in demo window
-    var show_demo_window = true;
-    if (show_demo_window) {
-        c.igShowDemoWindow(&show_demo_window);
-    }
-
-    var show_mlem_window = true;
-    c.igSetNextWindowSize(.{ .x = 200, .y = 200 }, c.ImGuiCond_Once);
-    if (!c.igBegin("mlamOS", &show_mlem_window, 0)) {
-        c.igEnd();
-        c.igRender();
-        const draw_data = try mk.sdlv(c.igGetDrawData());
-        if (draw_data.*.DisplaySize.x <= 0.0 or draw_data.*.DisplaySize.y <= 0.0) {
-            std.time.sleep(16 * 1000 * 1000); // if draw area is 0 or negative, skip rendering cycle
-            return;
-        }
-        self.im_draw_data = draw_data;
-        return;
-    }
-    c.igPushItemWidth(c.igGetFontSize() * -12);
-    c.igText(&mk.frame_print_buffer);
-    mk.reset_frame_print_buffer();
-    c.igEnd();
-
-    // rendering phase
-    c.igRender();
-    const draw_data = try mk.sdlv(c.igGetDrawData());
-    if (draw_data.*.DisplaySize.x <= 0.0 or draw_data.*.DisplaySize.y <= 0.0) {
-        std.time.sleep(16 * 1000 * 1000); // if draw area is 0 or negative, skip rendering cycle
-        return;
-    }
-    self.im_draw_data = draw_data;
 }
 
 fn draw_to_screen(self: *Engine) !void {
     const command_buffer = try mk.sdlv(c.SDL_AcquireGPUCommandBuffer(self.gpu_device));
 
-    // get swapchain texture early
-    // var swapchain_texture_ptr: ?*c.SDL_GPUTexture = null;
-    // try mk.sdlr(c.SDL_AcquireGPUSwapchainTexture(command_buffer, self.window, &swapchain_texture_ptr, null, null));
-    // const swapchain_texture = try mk.sdlv(swapchain_texture_ptr);
-
-    try self.imgui_frame();
+    for (self.renderables.items) |*r| {
+        r.pre_frame(command_buffer);
+    }
 
     try self.push_uniform_buffers(command_buffer);
 

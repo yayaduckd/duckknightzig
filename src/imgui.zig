@@ -1,5 +1,5 @@
 // Check sdlgpu3/ folder for the shaders' source code and instruction on how to build them
-const spirv_vertex: [1732]u8 = &.{
+const spirv_vertex: [1732]u8 = .{
     3,   2,   35,  7,   0,   0,   1,   0,   11, 0,   13,  0,  55, 0,  0,  0,  0,   0,   0,  0,   17,  0,   2,   0,   1,   0,   0,   0,   11,  0,   6,   0,   1,   0,   0,  0,   71, 76,  83, 76, 46, 115, 116, 100, 46,  52,  53,  48, 0,   0,   0,   0,   14,  0,   3,   0,   0,  0,   0,   0,   1,   0,   0,   0,   15,  0,   10,  0,  0,   0,   0,   0,   4,   0,   0,   0,   109,
     97,  105, 110, 0,   0,   0,   0,   11,  0,  0,   0,   15, 0,  0,  0,  21, 0,   0,   0,  30,  0,   0,   0,   31,  0,   0,   0,   3,   0,   3,   0,   2,   0,   0,   0,  194, 1,  0,   0,  4,  0,  10,  0,   71,  76,  95,  71,  79, 79,  71,  76,  69,  95,  99,  112, 112, 95, 115, 116, 121, 108, 101, 95,  108, 105, 110, 101, 95, 100, 105, 114, 101, 99,  116, 105, 118, 101,
     0,   0,   4,   0,   8,   0,   71,  76,  95, 71,  79,  79, 71, 76, 69, 95, 105, 110, 99, 108, 117, 100, 101, 95,  100, 105, 114, 101, 99,  116, 105, 118, 101, 0,   5,  0,   4,  0,   4,  0,  0,  0,   109, 97,  105, 110, 0,   0,  0,   0,   5,   0,   3,   0,   9,   0,   0,  0,   0,   0,   0,   0,   6,   0,   5,   0,   9,   0,  0,   0,   0,   0,   0,   0,   67,  111, 108,
@@ -24,7 +24,7 @@ const spirv_vertex: [1732]u8 = &.{
     0,   3,   0,   48,  0,   0,   0,   47,  0,  0,   0,   65, 0,  6,  0,  50, 0,   0,   0,  51,  0,   0,   0,   30,  0,   0,   0,   13,  0,   0,   0,   26,  0,   0,   0,  61,  0,  4,   0,  6,  0,  0,   0,   52,  0,   0,   0,   51, 0,   0,   0,   133, 0,   5,   0,   6,   0,  0,   0,   53,  0,   0,   0,   52,  0,   0,   0,   49, 0,   0,   0,   65,  0,   6,   0,   50,  0,
     0,   0,   54,  0,   0,   0,   30,  0,   0,  0,   13,  0,  0,  0,  26, 0,  0,   0,   62, 0,   3,   0,   54,  0,   0,   0,   53,  0,   0,   0,   253, 0,   1,   0,   56, 0,   1,  0,
 };
-const spirv_fragment: [844]u8 = &.{
+const spirv_fragment: [844]u8 = .{
     3,   2,   35, 7, 0,  0,  1,  0,  11, 0,  13, 0,   30,  0,   0,   0,   0,  0,   0,   0,   17,  0,  2,   0,   1,   0,   0,  0,   11,  0,   6,   0,  1,  0, 0,   0, 71, 76, 83, 76, 46,  115, 116, 100, 46, 52, 53, 48, 0,  0,  0,  0,  14, 0,   3,   0,  0,   0,   0,   0,   1,   0,   0,   0,   15,  0,   7,  0,   4,   0,   0,   0,  4,   0,   0,   0,   109, 97,
     105, 110, 0,  0, 0,  0,  9,  0,  0,  0,  13, 0,   0,   0,   16,  0,   3,  0,   4,   0,   0,   0,  7,   0,   0,   0,   3,  0,   3,   0,   2,   0,  0,  0, 194, 1, 0,  0,  4,  0,  10,  0,   71,  76,  95, 71, 79, 79, 71, 76, 69, 95, 99, 112, 112, 95, 115, 116, 121, 108, 101, 95,  108, 105, 110, 101, 95, 100, 105, 114, 101, 99, 116, 105, 118, 101, 0,   0,
     4,   0,   8,  0, 71, 76, 95, 71, 79, 79, 71, 76,  69,  95,  105, 110, 99, 108, 117, 100, 101, 95, 100, 105, 114, 101, 99, 116, 105, 118, 101, 0,  5,  0, 4,   0, 4,  0,  0,  0,  109, 97,  105, 110, 0,  0,  0,  0,  5,  0,  4,  0,  9,  0,   0,   0,  102, 67,  111, 108, 111, 114, 0,   0,   5,   0,   3,  0,   11,  0,   0,   0,  0,   0,   0,   0,   6,   0,
@@ -38,4 +38,156 @@ const spirv_fragment: [844]u8 = &.{
     26,  0,   0,  0, 87, 0,  5,  0,  7,  0,  0,  0,   28,  0,   0,   0,   23, 0,   0,   0,   27,  0,  0,   0,   133, 0,   5,  0,   7,   0,   0,   0,  29, 0, 0,   0, 18, 0,  0,  0,  28,  0,   0,   0,   62, 0,  3,  0,  9,  0,  0,  0,  29, 0,   0,   0,  253, 0,   1,   0,   56,  0,   1,   0,
 };
 
-pub fn init() !void {}
+const c = @import("cmix.zig");
+const std = @import("std");
+
+const mk = @import("mkmix.zig");
+
+const Self = @This();
+
+// im_draw_data: ([*c]c.struct_ImDrawData),
+pipeline: *c.SDL_GPUGraphicsPipeline,
+
+pub fn init(window: *c.SDL_Window, gpu_device: *c.SDL_GPUDevice) !Self {
+    // setup imgui context and io
+    _ = c.igCreateContext(null);
+    const io = c.igGetIO_Nil();
+    io.*.ConfigFlags |= c.ImGuiConfigFlags_NavEnableKeyboard; // enable keyboard navigation
+    io.*.ConfigFlags |= c.ImGuiConfigFlags_NavEnableGamepad; // enable gamepad navigation
+    c.igStyleColorsDark(null);
+
+    // initialize imgui platform/renderer backends
+    // assuming sdl_bool return (0 for false) for imgui_implsdl3_initforsdlgpu
+    if (c.ImGui_ImplSDL3_InitForSDLGPU(window) == false) {
+        std.log.err("imgui_implsdl3_initforsdlgpu failed.", .{});
+    }
+    var init_info: c.ImGui_ImplSDLGPU3_InitInfo = .{
+        .Device = gpu_device,
+        .ColorTargetFormat = c.SDL_GetGPUSwapchainTextureFormat(gpu_device, window),
+        .MSAASamples = c.SDL_GPU_SAMPLECOUNT_1,
+        // other fields are zero-initialized by default
+    };
+    if (c.ImGui_ImplSDLGPU3_Init(&init_info) == false) {
+        std.log.err("imgui_implsdlgpu3_init failed.", .{});
+    }
+
+    const vertshader = try mk.load_shader_bytes(gpu_device, c.SDL_GPU_SHADERSTAGE_VERTEX, &spirv_vertex, 0, 1, 0, 0);
+    const fragshader = try mk.load_shader_bytes(gpu_device, c.SDL_GPU_SHADERSTAGE_FRAGMENT, &spirv_fragment, 1, 0, 0, 0);
+
+    const pipelineCreateInfo: c.SDL_GPUGraphicsPipelineCreateInfo = .{
+        .vertex_shader = vertshader,
+        .fragment_shader = fragshader,
+
+        .vertex_input_state = .{
+            .num_vertex_buffers = 1,
+            .vertex_buffer_descriptions = &.{
+                .slot = 0,
+                .input_rate = c.SDL_GPU_VERTEXINPUTRATE_VERTEX,
+                .instance_step_rate = 0,
+                .pitch = @sizeOf(c.ImDrawVert),
+            },
+            .num_vertex_attributes = 3,
+
+            .vertex_attributes = &[_]c.SDL_GPUVertexAttribute{
+                .{
+                    .location = 0,
+                    .buffer_slot = 0,
+                    .format = c.SDL_GPU_VERTEXELEMENTFORMAT_FLOAT2,
+                    .offset = @offsetOf(c.ImDrawVert, "pos"),
+                },
+                .{
+                    .location = 1,
+                    .buffer_slot = 0,
+                    .format = c.SDL_GPU_VERTEXELEMENTFORMAT_FLOAT2,
+                    .offset = @offsetOf(c.ImDrawVert, "uv"),
+                },
+                .{
+                    .location = 2,
+                    .buffer_slot = 0,
+                    .format = c.SDL_GPU_VERTEXELEMENTFORMAT_UBYTE4_NORM,
+                    .offset = @offsetOf(c.ImDrawVert, "col"),
+                },
+            },
+        },
+
+        .primitive_type = c.SDL_GPU_PRIMITIVETYPE_TRIANGLELIST,
+
+        .rasterizer_state = .{
+            .fill_mode = c.SDL_GPU_FILLMODE_FILL,
+            .cull_mode = c.SDL_GPU_CULLMODE_NONE,
+            .front_face = c.SDL_GPU_FRONTFACE_COUNTER_CLOCKWISE,
+            .enable_depth_bias = false,
+            .enable_depth_clip = false,
+        },
+
+        .multisample_state = .{
+            // .sample_count = v.MSAASamples,
+            .sample_count = c.SDL_GPU_SAMPLECOUNT_1,
+            .enable_mask = false,
+        },
+
+        .depth_stencil_state = .{
+            .enable_depth_test = true,
+            .enable_depth_write = true,
+            .enable_stencil_test = false,
+            .compare_op = c.SDL_GPU_COMPAREOP_LESS_OR_EQUAL,
+            .write_mask = 0xFF,
+        },
+        .target_info = .{
+            .num_color_targets = 1,
+            .color_target_descriptions = &[_]c.SDL_GPUColorTargetDescription{
+                .{
+                    .format = c.SDL_GetGPUSwapchainTextureFormat(gpu_device, window),
+                    .blend_state = .{
+                        .enable_blend = true,
+                        .src_color_blendfactor = c.SDL_GPU_BLENDFACTOR_SRC_ALPHA,
+                        .dst_color_blendfactor = c.SDL_GPU_BLENDFACTOR_ONE_MINUS_SRC_ALPHA,
+                        .color_blend_op = c.SDL_GPU_BLENDOP_ADD,
+                        .src_alpha_blendfactor = c.SDL_GPU_BLENDFACTOR_ONE,
+                        .dst_alpha_blendfactor = c.SDL_GPU_BLENDFACTOR_ONE_MINUS_SRC_ALPHA,
+                        .alpha_blend_op = c.SDL_GPU_BLENDOP_ADD,
+                        .color_write_mask = c.SDL_GPU_COLORCOMPONENT_R | c.SDL_GPU_COLORCOMPONENT_G | c.SDL_GPU_COLORCOMPONENT_B | c.SDL_GPU_COLORCOMPONENT_A,
+                    },
+                },
+            },
+            .has_depth_stencil_target = true,
+            .depth_stencil_format = c.SDL_GPU_TEXTUREFORMAT_D16_UNORM,
+        },
+    };
+    const pipeline = try mk.sdlv(c.SDL_CreateGPUGraphicsPipeline(gpu_device, &pipelineCreateInfo));
+    // std.log.debug("{d}", .{@intFromPtr(pipeline)});
+
+    return Self{
+        .pipeline = pipeline,
+    };
+}
+
+pub fn copy(self: *Self, command_buffer: *c.SDL_GPUCommandBuffer) void {
+    _ = command_buffer; // autofix
+    _ = self; // autofix
+
+}
+
+pub fn render(self: *const Self, command_buffer: *c.SDL_GPUCommandBuffer, render_pass: *c.SDL_GPURenderPass) void {
+    const im_draw_data = mk.sdlv(c.igGetDrawData()) catch return;
+    // c.SDL_BindGPUGraphicsPipeline(render_pass, self.pipeline);
+    if (@intFromPtr(self.pipeline) == 0) @panic("kys");
+
+    c.ImGui_ImplSDLGPU3_RenderDrawData(im_draw_data, command_buffer, render_pass, self.pipeline); // render imgui draw data using the sdlgpu backend commands
+
+}
+
+pub fn pre_frame(self: *Self, command_buffer: *c.SDL_GPUCommandBuffer) void {
+    _ = self; // autofix
+
+    // rendering phase
+    c.igRender();
+    const draw_data = mk.sdlv(c.igGetDrawData()) catch return;
+    if (draw_data.*.DisplaySize.x <= 0.0 or draw_data.*.DisplaySize.y <= 0.0) {
+        std.time.sleep(16 * 1000 * 1000); // if draw area is 0 or negative, skip rendering cycle
+        return;
+    }
+    // self.im_draw_data = draw_data;
+    c.Imgui_ImplSDLGPU3_PrepareDrawData(draw_data, command_buffer); // prepare imgui draw data for sdlgpu backend
+
+}

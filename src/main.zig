@@ -4,8 +4,40 @@ const mk = @import("mkmix.zig");
 
 const Engine = @import("mlemgine.zig");
 const Batcher = @import("drawer.zig");
+const Imgui = @import("imgui.zig");
 
 var batcher: Batcher = undefined;
+var igInst: @import("imgui.zig") = undefined;
+
+pub fn imgui_menu() void {
+    // start a new imgui frame
+    c.ImGui_ImplSDLGPU3_NewFrame();
+    c.ImGui_ImplSDL3_NewFrame();
+    c.igNewFrame();
+    // show imgui's built-in demo window
+    var show_demo_window = true;
+    if (show_demo_window) {
+        c.igShowDemoWindow(&show_demo_window);
+    }
+
+    var show_mlem_window = true;
+    c.igSetNextWindowSize(.{ .x = 200, .y = 200 }, c.ImGuiCond_Once);
+    if (!c.igBegin("mlamOS", &show_mlem_window, 0)) {
+        c.igEnd();
+        c.igRender();
+        const draw_data = mk.sdlv(c.igGetDrawData()) catch return;
+        if (draw_data.*.DisplaySize.x <= 0.0 or draw_data.*.DisplaySize.y <= 0.0) {
+            std.time.sleep(16 * 1000 * 1000); // if draw area is 0 or negative, skip rendering cycle
+            return;
+        }
+        // self.im_draw_data = draw_data;
+        return;
+    }
+    c.igPushItemWidth(c.igGetFontSize() * -12);
+    c.igText(&mk.frame_print_buffer);
+    mk.reset_frame_print_buffer();
+    c.igEnd();
+}
 
 fn init(engine: *Engine) anyerror!void {
     batcher = try Batcher.init(engine.*);
@@ -17,6 +49,9 @@ fn init(engine: *Engine) anyerror!void {
     engine.debug_texture = batcher.register_texture(image_data);
     c.SDL_DestroySurface(image_data);
     try engine.renderables.append(mk.Renderable{ .batcher = &batcher });
+
+    igInst = try Imgui.init(engine.window, engine.gpu_device);
+    try engine.renderables.append(mk.Renderable{ .imgui = &(igInst) });
 }
 
 fn draw(self: *Engine) !void {
@@ -50,6 +85,7 @@ fn draw(self: *Engine) !void {
         }
     }
     batcher.end();
+    imgui_menu();
 }
 
 fn update(self: *Engine) anyerror!void {
