@@ -41,7 +41,7 @@ fn draw(self: *Engine) !void {
             );
             batcher.add(
                 .{
-                    .pos = .{ pos_x + 0.5 * spacing, pos_y + 0.5, 0 },
+                    .pos = .{ pos_x + 0.5 * spacing, pos_y + 0.5, @sin(t) },
                     .rot = t,
                     .scale = .{ scale / 2, scale / 2 },
                 },
@@ -54,6 +54,7 @@ fn draw(self: *Engine) !void {
 
 fn update(self: *Engine) anyerror!void {
     _ = self; // autofix
+
 }
 
 pub fn main() !void {

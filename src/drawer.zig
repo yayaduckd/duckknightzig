@@ -60,9 +60,18 @@ pub fn init(engine: Engine) !Self {
                 .dst_color_blendfactor = c.SDL_GPU_BLENDFACTOR_ONE_MINUS_SRC_ALPHA,
                 .dst_alpha_blendfactor = c.SDL_GPU_BLENDFACTOR_ONE_MINUS_SRC_ALPHA,
             } },
+            .has_depth_stencil_target = true,
+            .depth_stencil_format = c.SDL_GPU_TEXTUREFORMAT_D16_UNORM,
         },
         .rasterizer_state = .{
             .cull_mode = c.SDL_GPU_CULLMODE_NONE,
+        },
+        .depth_stencil_state = .{
+            .enable_depth_test = true,
+            .enable_depth_write = true,
+            .enable_stencil_test = false,
+            .compare_op = c.SDL_GPU_COMPAREOP_LESS_OR_EQUAL,
+            .write_mask = 0xFF,
         },
         .primitive_type = c.SDL_GPU_PRIMITIVETYPE_TRIANGLESTRIP,
         .vertex_shader = vertshader,
@@ -105,7 +114,7 @@ pub fn init(engine: Engine) !Self {
 }
 
 pub fn register_texture(self: *Self, image_data: *c.SDL_Surface) *c.SDL_GPUTexture {
-    const texture = c.SDL_CreateGPUTexture(self.gpu_device, &(c.SDL_GPUTextureCreateInfo){
+    const color_texture = c.SDL_CreateGPUTexture(self.gpu_device, &(c.SDL_GPUTextureCreateInfo){
         .type = c.SDL_GPU_TEXTURETYPE_2D,
         .format = c.SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM,
         .width = @intCast(image_data.w),
@@ -130,12 +139,12 @@ pub fn register_texture(self: *Self, image_data: *c.SDL_Surface) *c.SDL_GPUTextu
     c.SDL_UploadToGPUTexture(copy_pass, &(c.SDL_GPUTextureTransferInfo){
         .transfer_buffer = texture_transfer_buffer,
         .offset = 0, //* Zeroes out the rest */
-    }, &(c.SDL_GPUTextureRegion){ .texture = texture, .w = @intCast(image_data.w), .h = @intCast(image_data.h), .d = 1 }, true);
+    }, &(c.SDL_GPUTextureRegion){ .texture = color_texture, .w = @intCast(image_data.w), .h = @intCast(image_data.h), .d = 1 }, true);
 
     c.SDL_DestroySurface(image_data);
     c.SDL_EndGPUCopyPass(copy_pass);
     _ = c.SDL_SubmitGPUCommandBuffer(upload_cmd_buf);
-    return texture;
+    return color_texture;
 }
 
 pub fn add(self: *Self, params: SpriteParams, texture: *c.SDL_GPUTexture) void {

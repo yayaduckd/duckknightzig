@@ -29,6 +29,8 @@ gpu_device: *c.SDL_GPUDevice = undefined,
 
 duck_texture: *c.SDL_GPUTexture = undefined,
 debug_texture: *c.SDL_GPUTexture = undefined,
+
+depth_texture: *c.SDL_GPUTexture = undefined,
 // duck_sampler: *c.SDL_GPUSampler = undefined,
 
 clear_color: c.ImVec4 = .{ .x = 0.39, .y = 0.58, .z = 0.93, .w = 1.00 }, // clear color for rendering
@@ -52,42 +54,27 @@ fn cleanup(self: *Engine) void {
 
 }
 
-fn init_graphics(self: *Engine) !void {
+pub fn init(impl: EngineImpl) !Engine {
+    var self = Engine{ .impl = impl };
+
     // setup sdl stuff
-    // sdl initialization
     try mk.sdlr(c.SDL_Init(c.SDL_INIT_VIDEO));
 
-    // window creation
+    // window & gpu device
     self.window = try mk.sdlv(c.SDL_CreateWindow("tongue", 1000, 1000, c.SDL_WINDOW_RESIZABLE));
-
-    // gpu device creation
     self.gpu_device = try mk.sdlv(c.SDL_CreateGPUDevice(
         c.SDL_GPU_SHADERFORMAT_SPIRV,
         true, // debug_mode enabled
         null,
     ));
-
-    // claim window for gpu device
     try mk.sdlr(c.SDL_ClaimWindowForGPUDevice(self.gpu_device, self.window));
-
-    // set swapchain parameters
     try mk.sdlr(c.SDL_SetGPUSwapchainParameters(self.gpu_device, self.window, c.SDL_GPU_SWAPCHAINCOMPOSITION_SDR, c.SDL_GPU_PRESENTMODE_MAILBOX));
-}
-
-pub fn init(impl: EngineImpl) !Engine {
-    var self = Engine{ .impl = impl };
-
-    // setup general stuff
-    try self.init_graphics();
 
     // setup imgui context and io
     _ = c.igCreateContext(null);
-
     const io = c.igGetIO_Nil();
     io.*.ConfigFlags |= c.ImGuiConfigFlags_NavEnableKeyboard; // enable keyboard navigation
     io.*.ConfigFlags |= c.ImGuiConfigFlags_NavEnableGamepad; // enable gamepad navigation
-
-    // set imgui style to dark
     c.igStyleColorsDark(null);
 
     // initialize imgui platform/renderer backends
@@ -95,7 +82,6 @@ pub fn init(impl: EngineImpl) !Engine {
     if (c.ImGui_ImplSDL3_InitForSDLGPU(self.window) == false) {
         std.log.err("imgui_implsdl3_initforsdlgpu failed.", .{});
     }
-
     var init_info: c.ImGui_ImplSDLGPU3_InitInfo = .{
         .Device = self.gpu_device,
         .ColorTargetFormat = c.SDL_GetGPUSwapchainTextureFormat(self.gpu_device, self.window),
@@ -109,12 +95,20 @@ pub fn init(impl: EngineImpl) !Engine {
     const camera: cam = .default;
     self.camera = camera;
     self.renderables = std.ArrayList(mk.Renderable).init(mk.alloc);
-    // try self.renderables.append(mk.Renderable{
-    //     .batcher = try Batcher.init(self),
-    // });
 
-    // try self.load_content();
+    var w: c_int = 0;
+    var h: c_int = 0;
+    try mk.sdlr(c.SDL_GetWindowSizeInPixels(self.window, &w, &h));
 
+    self.depth_texture = c.SDL_CreateGPUTexture(self.gpu_device, &(c.SDL_GPUTextureCreateInfo){
+        .type = c.SDL_GPU_TEXTURETYPE_2D,
+        .format = c.SDL_GPU_TEXTUREFORMAT_D16_UNORM,
+        .width = @intCast(w),
+        .height = @intCast(h),
+        .layer_count_or_depth = 1,
+        .num_levels = 1,
+        .usage = c.SDL_GPU_TEXTUREUSAGE_DEPTH_STENCIL_TARGET,
+    }).?;
     try self.impl.init_fn(&self);
     return self;
 }
@@ -165,7 +159,17 @@ pub fn render(self: *Engine, command_buffer: *c.SDL_GPUCommandBuffer) !void {
         // other target_info fields use default zero-initialization
     };
 
-    const render_pass = try mk.sdlv(c.SDL_BeginGPURenderPass(command_buffer, &target_info, 1, null));
+    const depthStencilTargetInfo: c.SDL_GPUDepthStencilTargetInfo = .{
+        .texture = self.depth_texture,
+        .cycle = true,
+        .clear_depth = 1,
+        .clear_stencil = 0,
+        .load_op = c.SDL_GPU_LOADOP_CLEAR,
+        .store_op = c.SDL_GPU_STOREOP_STORE,
+        .stencil_load_op = c.SDL_GPU_LOADOP_CLEAR,
+        .stencil_store_op = c.SDL_GPU_STOREOP_STORE,
+    };
+    const render_pass = try mk.sdlv(c.SDL_BeginGPURenderPass(command_buffer, &target_info, 1, &depthStencilTargetInfo));
 
     // self.batcher.render(render_pass);
     for (self.renderables.items) |*r| {
@@ -244,7 +248,6 @@ pub fn run(self: *Engine) !void {
         self.update();
         try self.impl.draw_fn(self);
 
-        // try self.draw(); // draw sprites with xna-type interface
         try self.draw_to_screen(); // sdl gpu render logic
 
         self.current_frame += 1;
@@ -252,18 +255,10 @@ pub fn run(self: *Engine) !void {
     }
 }
 
-// fn load_content(self: *Engine) !void {
-//     var image_data = try mk.load_image("mduck.png", 4);
-//     self.duck_texture = self.renderables.items[0].batcher.register_texture(image_data);
-//     c.SDL_DestroySurface(image_data);
-
-//     image_data = try mk.load_image("debug.png", 4);
-//     self.debug_texture = self.renderables.items[0].batcher.register_texture(image_data);
-//     c.SDL_DestroySurface(image_data);
-// }
-
 fn update(self: *Engine) void {
+    // inputs
     var event: c.SDL_Event = undefined;
+
     while (c.SDL_PollEvent(&event) != false) {
         _ = c.ImGui_ImplSDL3_ProcessEvent(&event); // pass event to imgui for processing
         if (event.type == c.SDL_EVENT_QUIT) {
@@ -273,36 +268,38 @@ fn update(self: *Engine) void {
         if (event.type == c.SDL_EVENT_WINDOW_CLOSE_REQUESTED and event.window.windowID == c.SDL_GetWindowID(self.window)) {
             self.done = true;
         }
+        if (event.type == c.SDL_EVENT_KEY_DOWN) {
+            if (event.key.scancode == c.SDL_SCANCODE_A) {
+                self.camera.translate(.{ -0.1, 0, 0 });
+            }
+            if (event.key.scancode == c.SDL_SCANCODE_D) {
+                self.camera.translate(.{ 0.1, 0, 0 });
+            }
+            if (event.key.scancode == c.SDL_SCANCODE_W) {
+                self.camera.translate(.{ 0, 0, -0.1 });
+            }
+            if (event.key.scancode == c.SDL_SCANCODE_S) {
+                self.camera.translate(.{ 0, 0, 0.1 });
+            }
+            if (event.key.scancode == c.SDL_SCANCODE_Q) {
+                self.camera.translate(.{ 0, -0.1, 0 });
 
-        // inputs
-        // if (event.type == c.SDL_EVENT_KEY_DOWN) {
-        //     if (event.key.scancode == c.SDL_SCANCODE_A) {
-        //         self.batcher.camera.translate(.{ -0.1, 0 });
-        //     }
-        //     if (event.key.scancode == c.SDL_SCANCODE_D) {
-        //         self.batcher.camera.translate(.{ 0.1, 0 });
-        //     }
-        //     if (event.key.scancode == c.SDL_SCANCODE_W) {
-        //         self.batcher.camera.translate(.{ 0, 0.1 });
-        //     }
-        //     if (event.key.scancode == c.SDL_SCANCODE_S) {
-        //         self.batcher.camera.translate(.{ 0, -0.1 });
-        //     }
-        //     if (event.key.scancode == c.SDL_SCANCODE_Q) {
-        //         self.batcher.camera.zoom(-0.1);
-        //     }
-        //     if (event.key.scancode == c.SDL_SCANCODE_E) {
-        //         self.batcher.camera.zoom(0.1);
-        //     }
-        //     if (event.key.scancode == c.SDL_SCANCODE_R) {
-        //         self.batcher.camera.rotate(std.math.degreesToRadians(10));
-        //     }
-        // }
+                // self.camera.zoom(-0.1);
+            }
+            if (event.key.scancode == c.SDL_SCANCODE_E) {
+                // self.camera.zoom(0.1);
+                self.camera.translate(.{ 0, 0.1, 0 });
+            }
+            if (event.key.scancode == c.SDL_SCANCODE_R) {
+                self.camera.rotate(std.math.degreesToRadians(10));
+            }
+        }
     }
     var x: f32 = 0;
     var y: f32 = 0;
     _ = c.SDL_GetMouseState(&x, &y);
     mk.frame_print("mouse x {d} y {d}\n", .{ x, y });
+    mk.frame_print("cam x {d} y {d} z {d}", .{ self.camera.pos[0], self.camera.pos[1], self.camera.pos[2] });
 
     if ((c.SDL_GetWindowFlags(self.window) & c.SDL_WINDOW_MINIMIZED) != 0) {
         std.time.sleep(16 * 1000 * 1000); // if window is minimized, delay to reduce cpu usage
