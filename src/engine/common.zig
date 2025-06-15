@@ -174,7 +174,7 @@ pub fn load_image(filename: []const u8, desired_channels: u8) !*c.SDL_Surface {
     var result: ?*c.SDL_Surface = c.IMG_Load(full_path);
 
     if (result == null) {
-        return error.MkCouldntLoadBMP;
+        return error.MkCouldntLoadImg;
     }
 
     if (desired_channels == 4) {
@@ -184,6 +184,7 @@ pub fn load_image(filename: []const u8, desired_channels: u8) !*c.SDL_Surface {
         c.SDL_DestroySurface(result);
         @panic("squeeb");
     }
+
     if (result.?.format != format) {
         const next = c.SDL_ConvertSurface(result, format);
         c.SDL_DestroySurface(result);

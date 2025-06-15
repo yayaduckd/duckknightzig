@@ -22,7 +22,6 @@ pub const Renderable = union(enum) {
     pub fn copy(self: Renderable, cmd_buf: *c.SDL_GPUCommandBuffer, copy_pass: *c.SDL_GPUCopyPass) void {
         switch (self) {
             .batcher => |b| return b.copy(copy_pass),
-
             .imgui => |i| return i.copy(cmd_buf),
         }
     }

@@ -11,6 +11,7 @@ fn create_exe(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.bui
     exe.linkLibCpp();
     exe.linkSystemLibrary("SDL3");
     exe.linkSystemLibrary("SDL3_image");
+    exe.linkSystemLibrary("box2d");
 
     const imgui_lib = b.addStaticLibrary(.{
         .name = "imguilib",
@@ -41,7 +42,7 @@ fn create_exe(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.bui
     exe.addCSourceFile(.{ .file = cimgui.path("cimgui_impl.cpp") });
     exe.linkLibrary(imgui_lib);
     exe.addIncludePath(cimgui.path(""));
-    exe.addIncludePath(b.path("src/include/"));
+    exe.addIncludePath(b.path("src/engine/include/"));
 
     return exe;
 }
@@ -64,7 +65,7 @@ fn checkIsShaderFile(file: std.fs.Dir.Walker.Entry) bool {
 }
 
 fn compileShaders(b: *std.Build) !void {
-    const shaderPath = "src/shaders/";
+    const shaderPath = "src/engine/shaders/";
     const shaderBuildPath = "build/shaders/";
 
     if (b.build_root.path == null) {
