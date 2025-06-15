@@ -29,7 +29,6 @@ pub fn imgui_menu() void {
             std.time.sleep(16 * 1000 * 1000); // if draw area is 0 or negative, skip rendering cycle
             return;
         }
-        // self.im_draw_data = draw_data;
         return;
     }
     c.igPushItemWidth(c.igGetFontSize() * -12);
@@ -38,14 +37,16 @@ pub fn imgui_menu() void {
     c.igEnd();
 }
 
+var duck_texture: mk.MkTexture = undefined;
+var debug_texture: mk.MkTexture = undefined;
 pub fn init(engine: *mk.Engine) anyerror!void {
     batcher = try mk.Batcher.init(engine.*);
     var image_data = try mk.load_image("mduck.png", 4);
-    engine.duck_texture = batcher.register_texture(image_data);
+    duck_texture = batcher.register_texture(image_data);
     c.SDL_DestroySurface(image_data);
 
     image_data = try mk.load_image("debug.png", 4);
-    engine.debug_texture = batcher.register_texture(image_data);
+    debug_texture = batcher.register_texture(image_data);
     c.SDL_DestroySurface(image_data);
     try engine.renderables.append(mk.Renderable{ .batcher = &batcher });
 
@@ -56,9 +57,8 @@ pub fn init(engine: *mk.Engine) anyerror!void {
     worlddef.gravity = c.b2Vec2{ .x = 0, .y = 1 };
 
     world = c.b2CreateWorld(&worlddef);
-    const chuk = dk.Chuk.init();
-    _ = chuk; // autofix
-    _ = dk.Chuk.newSquare(world, c.b2Vec2{ .x = -1, .y = -1 }, 1, engine.debug_texture);
+    dk.Chuk.init();
+    _ = dk.Chuk.newSquare(world, c.b2Vec2{ .x = -1, .y = -1 }, 1, debug_texture, true);
 }
 
 pub fn draw(self: *mk.Engine) !void {
@@ -79,7 +79,7 @@ pub fn draw(self: *mk.Engine) !void {
                     .rot = t,
                     .scale = .{ scale, scale },
                 },
-                self.duck_texture,
+                duck_texture,
             );
             batcher.add(
                 .{
@@ -87,7 +87,7 @@ pub fn draw(self: *mk.Engine) !void {
                     .rot = t,
                     .scale = .{ scale / 2, scale / 2 },
                 },
-                self.debug_texture,
+                debug_texture,
             );
         }
     }

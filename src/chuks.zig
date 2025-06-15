@@ -16,7 +16,7 @@ pub fn init() void {
     bodies = dk.SparseArray(c.b2BodyId).init(dk.alloc);
 }
 
-pub fn newSquare(world: c.b2WorldId, pos: c.b2Vec2, size: f32, texture: mk.MkTexture) u32 {
+pub fn newSquare(world: c.b2WorldId, pos: c.b2Vec2, size: f32, texture: mk.MkTexture, static: bool) u32 {
     // Implement the logic for creating a new square.
     // This will involve:
     // 1. Generating a new ID using DODUtils.newID().
@@ -29,7 +29,7 @@ pub fn newSquare(world: c.b2WorldId, pos: c.b2Vec2, size: f32, texture: mk.MkTex
 
     var bodyDef = c.b2DefaultBodyDef();
     bodyDef.position = pos;
-    bodyDef.type = c.b2_dynamicBody;
+    bodyDef.type = if (static) c.b2_staticBody else c.b2_dynamicBody;
 
     const body = c.b2CreateBody(world, &bodyDef);
     const box = c.b2MakeOffsetBox(size / 2, size / 2, .{ .x = size / 2, .y = size / 2 }, c.b2MakeRot(0));

@@ -22,13 +22,9 @@ done: bool = false,
 window: *c.SDL_Window = undefined,
 gpu_device: *c.SDL_GPUDevice = undefined,
 
-// pipeline: *c.SDL_GPUGraphicsPipeline = undefined,
 // gpu resources
 // vertex_buffer: *c.SDL_GPUBuffer = undefined,
 // index_buffer: *c.SDL_GPUBuffer = undefined,
-
-duck_texture: *c.SDL_GPUTexture = undefined,
-debug_texture: *c.SDL_GPUTexture = undefined,
 
 depth_texture: *c.SDL_GPUTexture = undefined,
 // duck_sampler: *c.SDL_GPUSampler = undefined,
@@ -108,15 +104,12 @@ fn push_uniform_buffers(self: *Engine, command_buffer: *c.SDL_GPUCommandBuffer) 
 
 fn copy(self: *Engine, command_buffer: *c.SDL_GPUCommandBuffer) !void {
     const copy_pass = try mk.sdlv(c.SDL_BeginGPUCopyPass(command_buffer));
-    // self.batcher.copy(copy_pass);
 
     for (self.renderables.items) |*r| {
         r.copy(command_buffer, copy_pass);
     }
 
     c.SDL_EndGPUCopyPass(copy_pass);
-
-    // imgui.copy_stage(command_buffer);
 }
 
 pub fn render(self: *Engine, command_buffer: *c.SDL_GPUCommandBuffer) !void {
@@ -150,12 +143,10 @@ pub fn render(self: *Engine, command_buffer: *c.SDL_GPUCommandBuffer) !void {
     };
     const render_pass = try mk.sdlv(c.SDL_BeginGPURenderPass(command_buffer, &target_info, 1, &depthStencilTargetInfo));
 
-    // self.batcher.render(render_pass);
     for (self.renderables.items) |*r| {
         r.render(command_buffer, render_pass);
     }
 
-    // imgui.render_stage(command_buffer, render_pass);
     c.SDL_EndGPURenderPass(render_pass);
 }
 
@@ -167,9 +158,7 @@ fn draw_to_screen(self: *Engine) !void {
     }
 
     try self.push_uniform_buffers(command_buffer);
-
     try self.copy(command_buffer);
-
     try self.render(command_buffer);
 
     _ = c.SDL_SubmitGPUCommandBuffer(command_buffer); // submit gpu commands for execution
@@ -177,21 +166,30 @@ fn draw_to_screen(self: *Engine) !void {
 
 pub fn run(self: *Engine) !void {
     var prev_t = std.time.nanoTimestamp();
+    var time_left: u64 = 0;
     while (!self.done) {
         const t = std.time.nanoTimestamp();
-        if (t - prev_t < 1000000000 / 240) continue;
+        const target_framerate_secs = 240;
+        const target_frametime = std.math.pow(u32, 10, 9) / target_framerate_secs;
+        const diff = t - prev_t;
+        if (diff < target_frametime) {
+            time_left = @intCast(target_frametime - diff);
+            std.time.sleep(time_left);
+        } else {
+            time_left = 0;
+        }
         try self.impl.update_fn(self);
-        self.update();
         try self.impl.draw_fn(self);
 
         try self.draw_to_screen(); // sdl gpu render logic
 
+        // render time
+        mk.frame_print("frametime: {d}ms\ntime_busy: {d}ms\n", .{
+            @as(f32, @floatFromInt(diff + time_left)) / 1000000,
+            @as(f32, @floatFromInt(diff)) / 1000000,
+        });
+
         self.current_frame += 1;
         prev_t = t;
     }
-}
-
-fn update(self: *Engine) void {
-    _ = self; // autofix
-
 }
