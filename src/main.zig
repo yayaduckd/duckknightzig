@@ -89,8 +89,55 @@ fn draw(self: *Engine) !void {
 }
 
 fn update(self: *Engine) anyerror!void {
-    _ = self; // autofix
+    // inputs
+    var event: c.SDL_Event = undefined;
 
+    while (c.SDL_PollEvent(&event) != false) {
+        _ = c.ImGui_ImplSDL3_ProcessEvent(&event); // pass event to imgui for processing
+        if (event.type == c.SDL_EVENT_QUIT) {
+            self.done = true;
+        }
+
+        if (event.type == c.SDL_EVENT_WINDOW_CLOSE_REQUESTED and event.window.windowID == c.SDL_GetWindowID(self.window)) {
+            self.done = true;
+        }
+        if (event.type == c.SDL_EVENT_KEY_DOWN) {
+            if (event.key.scancode == c.SDL_SCANCODE_A) {
+                self.camera.translate(.{ -0.1, 0, 0 });
+            }
+            if (event.key.scancode == c.SDL_SCANCODE_D) {
+                self.camera.translate(.{ 0.1, 0, 0 });
+            }
+            if (event.key.scancode == c.SDL_SCANCODE_W) {
+                self.camera.translate(.{ 0, 0, -0.1 });
+            }
+            if (event.key.scancode == c.SDL_SCANCODE_S) {
+                self.camera.translate(.{ 0, 0, 0.1 });
+            }
+            if (event.key.scancode == c.SDL_SCANCODE_Q) {
+                self.camera.translate(.{ 0, -0.1, 0 });
+
+                // self.camera.zoom(-0.1);
+            }
+            if (event.key.scancode == c.SDL_SCANCODE_E) {
+                // self.camera.zoom(0.1);
+                self.camera.translate(.{ 0, 0.1, 0 });
+            }
+            if (event.key.scancode == c.SDL_SCANCODE_R) {
+                self.camera.rotate(std.math.degreesToRadians(10));
+            }
+        }
+    }
+    var x: f32 = 0;
+    var y: f32 = 0;
+    _ = c.SDL_GetMouseState(&x, &y);
+    mk.frame_print("mouse x {d} y {d}\n", .{ x, y });
+    mk.frame_print("cam x {d} y {d} z {d}", .{ self.camera.pos[0], self.camera.pos[1], self.camera.pos[2] });
+
+    if ((c.SDL_GetWindowFlags(self.window) & c.SDL_WINDOW_MINIMIZED) != 0) {
+        std.time.sleep(16 * 1000 * 1000); // if window is minimized, delay to reduce cpu usage
+        return;
+    }
 }
 
 pub fn main() !void {
